@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>TwitchOverlay — Configuration</title>
+<style>
+  :root {
+    --bg:         #08090e;
+    --surface:    #0f1018;
+    --surface-2:  #14161f;
+    --border:     #1e2133;
+    --border-hi:  #2a2e47;
+    --text:       #a8adc4;
+    --text-hi:    #dde0f0;
+    --text-dim:   #4a4f6a;
+    --accent:     #9b2a42;
+    --accent-lo:  #5a182a;
+    --accent-hi:  #c93655;
+    --green-text: #5ddba0;
+    --green-lo:   #1a4a30;
+    --red-text:   #e07080;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Top bar ────────────────────────────── */
+  .topbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 28px; height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-logo {
+    width: 20px; height: 20px;
+    background: var(--accent);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    flex-shrink: 0;
+  }
+  .topbar-name { font-size: 13px; font-weight: 600; color: var(--text-hi); }
+
+  /* ── Main ───────────────────────────────── */
+  .main {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 36px 24px 64px;
+  }
+
+  .page-title { font-size: 18px; font-weight: 600; color: var(--text-hi); margin-bottom: 4px; }
+  .page-sub   { font-size: 13px; color: var(--text-dim); margin-bottom: 28px; }
+
+  /* ── Checklist steps ────────────────────── */
+  .steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+
+  .step-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px;
+  }
+  .step-num {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent-lo); border: 1px solid var(--accent);
+    color: var(--accent-hi); font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-title {
+    font-size: 13px; font-weight: 600; color: var(--text-hi);
+  }
+
+  .step-body { font-size: 12px; color: var(--text); line-height: 1.65; }
+  .step-body p { margin-bottom: 6px; }
+  .step-body p:last-child { margin-bottom: 0; }
+
+  a { color: var(--accent-hi); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  code {
+    background: var(--surface-2);
+    border: 1px solid var(--border-hi);
+    padding: 1px 6px; border-radius: 4px;
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    font-size: 11px; color: var(--text-hi);
+  }
+
+  /* ── Form card ──────────────────────────── */
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 20px 24px;
+  }
+
+  .form-card-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 18px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .form-card-num {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent-lo); border: 1px solid var(--accent);
+    color: var(--accent-hi); font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .form-card-title { font-size: 13px; font-weight: 600; color: var(--text-hi); }
+
+  .field { margin-bottom: 14px; }
+  .field:last-of-type { margin-bottom: 20px; }
+  .field label {
+    display: block;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .field input {
+    display: block;
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border-hi);
+    color: var(--text-hi);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px; font-family: inherit;
+    outline: none;
+    transition: border-color 120ms;
+  }
+  .field input:focus { border-color: var(--accent-hi); }
+  .field input::placeholder { color: var(--text-dim); }
+  .field-hint {
+    font-size: 11px; color: var(--text-dim);
+    margin-top: 5px; line-height: 1.5;
+  }
+
+  /* ── Submit button ──────────────────────── */
+  .btn-submit {
+    width: 100%;
+    padding: 10px 16px;
+    background: var(--accent-lo);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: #fff; font-size: 13px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
+    transition: background 120ms;
+  }
+  .btn-submit:hover:not(:disabled) { background: var(--accent); }
+  .btn-submit:disabled { opacity: 0.5; cursor: default; }
+
+  /* ── Status message ─────────────────────── */
+  #msg {
+    margin-top: 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    min-height: 20px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    display: none;
+  }
+  #msg.error { display: block; background: #2a0d12; border: 1px solid #5a1820; color: var(--red-text); }
+  #msg.ok    { display: block; background: var(--green-lo); border: 1px solid #2d6644; color: var(--green-text); }
+</style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-logo"></div>
+    <span class="topbar-name">TwitchOverlay — Configuration initiale</span>
+  </header>
+
+  <main class="main">
+
+    <div class="page-title">Mise en place de l'overlay</div>
+    <p class="page-sub">À effectuer une seule fois. Durée estimée : 3 minutes.</p>
+
+    <div class="steps">
+
+      <!-- Step 1 -->
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">1</div>
+          <div class="step-title">Créer une application Twitch</div>
+        </div>
+        <div class="step-body">
+          <p>Rendez-vous sur <a href="https://dev.twitch.tv/console/apps" target="_blank">dev.twitch.tv/console/apps</a> et connectez-vous avec votre compte Twitch, puis cliquez sur <strong>Register Your Application</strong>.</p>
+          <p>Donnez-lui le nom de votre choix. Dans le champ <strong>OAuth Redirect URLs</strong>, entrez exactement&nbsp;:<br><code>http://localhost:3000/auth/callback</code></p>
+          <p>Laissez la catégorie sur <strong>Other</strong> et validez.</p>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">2</div>
+          <div class="step-title">Récupérer le Client ID et le Client Secret</div>
+        </div>
+        <div class="step-body">
+          <p>Dans la liste de vos applications, cliquez sur <strong>Manage</strong> à côté de l'application que vous venez de créer.</p>
+          <p>Copiez le <strong>Client ID</strong> affiché en haut. Cliquez ensuite sur <strong>New Secret</strong> pour générer un Client Secret, puis copiez-le immédiatement — il n'est affiché qu'une seule fois.</p>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">3</div>
+          <div class="step-title">Ajouter l'overlay dans OBS (après la configuration)</div>
+        </div>
+        <div class="step-body">
+          <p>Une fois la configuration terminée, ajoutez une <strong>Source Navigateur</strong> dans OBS avec l'URL&nbsp;: <code>http://localhost:3000/overlay.html</code></p>
+          <p>Dans la fenêtre de propriétés de la source, réglez bien les champs <strong>Largeur</strong> et <strong>Hauteur</strong> sur <strong>1920 × 1080</strong> (pas seulement la taille à laquelle vous l'étirez sur le canevas de la scène — sinon l'image sera floue), et cochez <em>Actualiser le navigateur quand la scène devient active</em>.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Form -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-num">4</div>
+        <div class="form-card-title">Renseigner vos informations</div>
+      </div>
+
+      <div class="field">
+        <label>Client ID</label>
+        <input id="clientId" type="text" placeholder="Copiez-le depuis dev.twitch.tv" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Client Secret</label>
+        <input id="clientSecret" type="password" placeholder="Généré via New Secret" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Pseudo Twitch de la chaîne</label>
+        <input id="twitchUsername" type="text" placeholder="ex : monpseudo" autocomplete="off" />
+        <div class="field-hint">Le nom exact de la chaîne à surveiller (pas besoin de connaître l'ID, il est résolu automatiquement). L'objectif de subs se règle après coup dans le panel d'administration.</div>
+      </div>
+
+      <button id="submitBtn" class="btn-submit" onclick="submitSetup()">Valider et connecter à Twitch</button>
+      <div id="msg"></div>
+    </div>
+
+  </main>
+
+<script>
+  async function submitSetup() {
+    const clientId       = document.getElementById('clientId').value.trim();
+    const clientSecret   = document.getElementById('clientSecret').value.trim();
+    const twitchUsername = document.getElementById('twitchUsername').value.trim();
+    const msg            = document.getElementById('msg');
+    const btn            = document.getElementById('submitBtn');
+
+    if (!clientId || !clientSecret || !twitchUsername) {
+      msg.className = 'error';
+      msg.textContent = 'Merci de remplir les 3 champs obligatoires.';
+      return;
+    }
+
+    btn.disabled    = true;
+    btn.textContent = 'Vérification en cours…';
+    msg.className   = '';
+    msg.textContent = '';
+
+    try {
+      const r    = await fetch('/setup', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ clientId, clientSecret, twitchUsername }),
+      });
+      const data = await r.json();
+
+      if (r.ok) {
+        msg.className   = 'ok';
+        msg.textContent = `Chaîne trouvée : ${data.displayName}. Redirection vers Twitch pour l'autorisation…`;
+        setTimeout(() => { window.location.href = '/auth'; }, 1000);
+      } else {
+        msg.className   = 'error';
+        msg.textContent = data.error || 'Une erreur est survenue, veuillez réessayer.';
+        btn.disabled    = false;
+        btn.textContent = 'Valider et connecter à Twitch';
+      }
+    } catch {
+      msg.className   = 'error';
+      msg.textContent = 'Impossible de contacter le serveur. Vérifiez que le programme est toujours en cours d\'exécution.';
+      btn.disabled    = false;
+      btn.textContent = 'Valider et connecter à Twitch';
+    }
+  }
+</script>
+</body>
+</html>
