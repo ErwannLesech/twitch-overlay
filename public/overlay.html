@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Overlay Subs / Followers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  /* Custom properties — overridden at runtime by applyTheme() */
+  :root {
+    --red:        #E0263F;
+    --red-bright: #FF5A6E;
+    --ink:        #170A10;
+    --ink-glass:  rgba(28, 8, 14, 0.72);
+    --violet:     #8A3AE0;
+    --violet-bright: #B57BFF;
+    --text:       #FFFFFF;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    background: transparent;
+    overflow: hidden;
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--text);
+  }
+
+  /* ---- Counter + goal block — fixed at the top-left of the 1920×1080 canvas ---- */
+  .rig {
+    position: fixed;
+    top: 14px;
+    left: 20px;
+    width: 580px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ---- Counter panels ---- */
+  .counters { display: flex; gap: 14px; }
+
+  .panel {
+    flex: 1;
+    position: relative;
+    background: var(--ink-glass);
+    border: 1px solid var(--red);
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+    padding: 10px 16px 12px;
+    backdrop-filter: blur(2px);
+  }
+
+  /* Gradient border via mask trick (clip-path doesn't support outline) */
+  .panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+    padding: 1px;
+    background: linear-gradient(135deg, var(--red-bright), transparent 40%, transparent 60%, var(--violet-bright));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: .8;
+  }
+
+  .label {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--red-bright);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .label .hex {
+    width: 8px; height: 8px;
+    background: var(--red-bright);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  }
+
+  .value {
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text);
+    text-shadow: 0 0 8px var(--violet-bright), 0 0 18px color-mix(in srgb, var(--violet-bright) 55%, transparent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Sub goal bar ---- */
+  .goal-wrap {
+    position: relative;
+    background: var(--ink-glass);
+    border: 1px solid var(--red);
+    clip-path: polygon(10px 0, 100% 0, 100% 100%, calc(100% - 10px) 100%, 0 100%, 0 10px);
+    padding: 10px 16px 12px;
+    overflow: visible;
+  }
+  .goal-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .goal-title {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--red-bright);
+  }
+  .goal-count {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .goal-track {
+    position: relative;
+    height: 16px;
+    background: rgba(255,255,255,0.06);
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--red) 50%, transparent);
+  }
+  .goal-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--violet), var(--red));
+    transition: width 900ms cubic-bezier(.2,.8,.2,1);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--red) 55%, transparent);
+  }
+
+  /* ---- Motivational sub goal message ---- */
+  .goal-msg {
+    margin-top: 7px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text);
+    text-align: center;
+    opacity: 0.70;
+  }
+
+  .goal-wrap.reached .goal-track {
+    animation: goal-pulse 900ms ease-in-out 3;
+  }
+  @keyframes goal-pulse {
+    0%, 100% { box-shadow: 0 0 0 transparent; }
+    50%       { box-shadow: 0 0 26px 6px color-mix(in srgb, var(--red) 80%, transparent); }
+  }
+
+  /* ---- Goal-reached banner ---- */
+  .goal-banner {
+    position: absolute;
+    left: 50%;
+    top: -18px;
+    transform: translate(-50%, -12px);
+    background: linear-gradient(120deg, var(--red) 0%, #7a0f1e 100%);
+    border: 1px solid var(--violet-bright);
+    clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+    padding: 10px 26px;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-size: 16px;
+    color: var(--text);
+    white-space: nowrap;
+    box-shadow: 0 0 30px color-mix(in srgb, var(--red) 80%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 20;
+  }
+  .goal-banner.show {
+    animation:
+      banner-in   500ms cubic-bezier(.2,.9,.3,1.4) forwards,
+      banner-hold 3000ms linear forwards 500ms,
+      banner-out  500ms ease-in forwards 3500ms;
+  }
+  @keyframes banner-in   { from { opacity: 0; transform: translate(-50%, 6px) scale(.7); } to { opacity: 1; transform: translate(-50%, -12px) scale(1); } }
+  @keyframes banner-hold { from { opacity: 1; } to { opacity: 1; } }
+  @keyframes banner-out  { to   { opacity: 0; transform: translate(-50%, -24px) scale(.9); } }
+
+  /* ---- Confetti particles (goal reached) ---- */
+  .confetti {
+    position: absolute;
+    top: -10px; left: 0; right: 0; height: 0;
+    pointer-events: none;
+    z-index: 15;
+    overflow: visible;
+  }
+  .confetti span {
+    position: absolute;
+    top: 0;
+    width: 6px; height: 12px;
+    opacity: 0;
+  }
+  .confetti.show span { animation: confetti-fall 1400ms ease-in forwards; }
+  @keyframes confetti-fall {
+    0%   { opacity: 1; transform: translateY(0) rotate(0deg); }
+    100% { opacity: 0; transform: translateY(140px) rotate(340deg); }
+  }
+
+  /* ---- Follow / sub alert — text only, no background, centered-top on the 1920×1080 canvas ----
+     Dark outline + colored glow keep the text readable over any game background. */
+  .toast-zone {
+    position: fixed;
+    top: 220px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 1100px;
+    text-align: center;
+    pointer-events: none;
+    z-index: 30;
+  }
+
+  .toast {
+    position: relative;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: 46px;
+    line-height: 1.15;
+    color: var(--text);
+    text-shadow:
+      -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
+      0 0 22px color-mix(in srgb, var(--red-bright) 75%, transparent),
+      0 0 44px color-mix(in srgb, var(--red-bright) 45%, transparent);
+    opacity: 0;
+  }
+  .toast .thanks {
+    display: block;
+    margin-top: 10px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 24px;
+    color: var(--text);
+    text-shadow:
+      -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
+      0 0 16px color-mix(in srgb, var(--violet-bright) 60%, transparent);
+  }
+
+  .toast.show {
+    animation:
+      toast-pop-in       550ms cubic-bezier(.2,1.4,.4,1) forwards,
+      toast-click-bounce 550ms ease-in-out 950ms,
+      toast-pop-out      400ms ease-in forwards 4600ms;
+  }
+  @keyframes toast-pop-in {
+    0%   { opacity: 0; transform: scale(0.4) translateY(24px); }
+    60%  { opacity: 1; transform: scale(1.12) translateY(-8px); }
+    80%  {             transform: scale(0.96) translateY(3px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  /* Press-and-release effect at the 950 ms mark */
+  @keyframes toast-click-bounce {
+    0%, 100% { transform: scale(1) translateY(0); }
+    40%      { transform: scale(0.94) translateY(10px); }
+    70%      { transform: scale(1.03) translateY(-3px); }
+  }
+  @keyframes toast-pop-out {
+    to { opacity: 0; transform: scale(0.8) translateY(-16px); }
+  }
+
+  /* Expanding ring fired at the click moment */
+  .toast.show::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 340px; height: 340px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--red) 60%, transparent);
+    transform: translate(-50%, -50%) scale(0.1);
+    opacity: 0;
+    animation: ring-ripple 700ms ease-out 950ms forwards;
+    pointer-events: none;
+  }
+  @keyframes ring-ripple {
+    0%   { opacity: 1; transform: translate(-50%, -50%) scale(0.1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); }
+  }
+
+  /* Counter bump on update */
+  .bump { animation: bump 420ms ease-out; }
+  @keyframes bump {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.18); text-shadow: 0 0 20px var(--violet-bright); }
+    100% { transform: scale(1); }
+  }
+
+  /* ---- Panel shape variants (set via data-shape on <body>) ---- */
+  [data-shape="round"] .panel,
+  [data-shape="round"] .goal-wrap    { clip-path: none; border-radius: 12px; }
+  [data-shape="round"] .panel::before { display: none; }
+  [data-shape="round"] .goal-track   { clip-path: none; border-radius: 8px; }
+  [data-shape="round"] .goal-banner  { clip-path: none; border-radius: 8px; }
+
+  [data-shape="flat"] .panel,
+  [data-shape="flat"] .goal-wrap     { clip-path: none; border-radius: 0; }
+  [data-shape="flat"] .panel::before { display: none; }
+  [data-shape="flat"] .goal-track    { clip-path: none; border-radius: 0; }
+  [data-shape="flat"] .goal-banner   { clip-path: none; border-radius: 0; }
+</style>
+</head>
+<body>
+
+  <!-- Counter block (anchored top-left) -->
+  <div class="rig">
+    <div class="counters">
+      <div class="panel">
+        <div class="label"><span class="hex"></span>Followers</div>
+        <div class="value" id="followers">0</div>
+      </div>
+      <div class="panel">
+        <div class="label"><span class="hex"></span>Subs</div>
+        <div class="value" id="subs">0</div>
+      </div>
+    </div>
+
+    <div class="goal-wrap" id="goalWrap">
+      <div class="confetti" id="confetti"></div>
+      <div class="goal-banner" id="goalBanner">Objectif atteint !</div>
+      <div class="goal-top">
+        <div class="goal-title">Sub Goal</div>
+        <div class="goal-count"><span id="goalCurrent">0</span> / <span id="goalTarget">100</span></div>
+      </div>
+      <div class="goal-track">
+        <div class="goal-fill" id="goalFill"></div>
+      </div>
+      <p class="goal-msg" id="goalMsg">Chaque sub rapproche la guilde de la victoire — rejoins-nous !</p>
+    </div>
+  </div>
+
+  <!-- Alert zone (centered on the canvas) -->
+  <div class="toast-zone" id="toastZone"></div>
+
+<script>
+  // DOM references
+  const followersEl   = document.getElementById('followers');
+  const subsEl        = document.getElementById('subs');
+  const goalCurrentEl = document.getElementById('goalCurrent');
+  const goalTargetEl  = document.getElementById('goalTarget');
+  const goalFillEl    = document.getElementById('goalFill');
+  const goalWrapEl    = document.getElementById('goalWrap');
+  const goalBannerEl  = document.getElementById('goalBanner');
+  const confettiEl    = document.getElementById('confetti');
+  const toastZone     = document.getElementById('toastZone');
+
+  // Last-rendered state — used to detect changes and drive animations
+  let shown = { followers: 0, subs: 0, subGoal: 100 };
+  let goalCelebrated = false;
+
+  // ---------------------------------------------------------------------------
+  // Theme
+  // ---------------------------------------------------------------------------
+
+  // Shifts each RGB channel of a hex colour by `amt` (positive = lighter).
+  function lighten(hex, amt) {
+    const c = (hex || '').replace('#', '');
+    if (!/^[0-9a-fA-F]{6}$/.test(c)) return hex;
+    const num   = parseInt(c, 16);
+    const clamp = (v) => Math.min(255, Math.max(0, v));
+    const r = clamp((num >> 16) + amt);
+    const g = clamp(((num >> 8) & 0xff) + amt);
+    const b = clamp((num & 0xff) + amt);
+    return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+  }
+
+  function applyTheme(s) {
+    const root = document.documentElement.style;
+
+    if (s.accentColor) {
+      root.setProperty('--red',        s.accentColor);
+      root.setProperty('--red-bright', lighten(s.accentColor, 55));
+    }
+    if (s.textColor) root.setProperty('--text', s.textColor);
+
+    document.body.dataset.shape = s.shape || 'hex';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Counter animation
+  // ---------------------------------------------------------------------------
+
+  function animateCount(el, from, to) {
+    if (from === to) return;
+    const duration = 700;
+    const start    = performance.now();
+    el.classList.add('bump');
+    setTimeout(() => el.classList.remove('bump'), 450);
+
+    function step(now) {
+      const t     = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(from + (to - from) * eased).toLocaleString('fr-FR');
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Goal celebration
+  // ---------------------------------------------------------------------------
+
+  function fireConfetti() {
+    const cs     = getComputedStyle(document.documentElement);
+    const colors = ['--red', '--red-bright', '--violet', '--violet-bright']
+      .map((v) => cs.getPropertyValue(v).trim());
+
+    confettiEl.innerHTML = '';
+    confettiEl.classList.remove('show');
+
+    for (let i = 0; i < 26; i++) {
+      const s            = document.createElement('span');
+      s.style.left           = (Math.random() * 100) + '%';
+      s.style.background     = colors[Math.floor(Math.random() * colors.length)];
+      s.style.animationDelay = (Math.random() * 250) + 'ms';
+      s.style.transform      = `rotate(${Math.random() * 360}deg)`;
+      confettiEl.appendChild(s);
+    }
+
+    void confettiEl.offsetWidth; // force reflow to restart the CSS animation
+    confettiEl.classList.add('show');
+  }
+
+  function celebrateGoal() {
+    goalWrapEl.classList.remove('reached');
+    goalBannerEl.classList.remove('show');
+    void goalWrapEl.offsetWidth; // force reflow
+    goalWrapEl.classList.add('reached');
+    goalBannerEl.classList.add('show');
+    fireConfetti();
+  }
+
+  // ---------------------------------------------------------------------------
+  // State update
+  // ---------------------------------------------------------------------------
+
+  function applyState(s) {
+    applyTheme(s);
+    animateCount(followersEl, shown.followers, s.followers);
+    animateCount(subsEl,      shown.subs,      s.subs);
+
+    goalCurrentEl.textContent = s.subs.toLocaleString('fr-FR');
+    goalTargetEl.textContent  = s.subGoal.toLocaleString('fr-FR');
+    goalFillEl.style.width    = Math.min(100, (s.subs / s.subGoal) * 100) + '%';
+
+    const reachedNow = s.subs >= s.subGoal;
+    const wasBelow   = shown.subs < shown.subGoal;
+    if (reachedNow && (wasBelow || shown.subGoal !== s.subGoal) && !goalCelebrated) {
+      celebrateGoal();
+      goalCelebrated = true;
+    }
+    if (!reachedNow) goalCelebrated = false;
+
+    shown.followers = s.followers;
+    shown.subs      = s.subs;
+    shown.subGoal   = s.subGoal;
+
+    const goalMsgEl = document.getElementById('goalMsg');
+    if (goalMsgEl) {
+      goalMsgEl.textContent    = s.goalMessage || '';
+      goalMsgEl.style.display  = s.goalMessage ? '' : 'none';
+    }
+  }
+
+  function fillTemplate(tpl, name) {
+    return (tpl || '').replace(/\{name\}/g, name);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Toast queue — one alert shown at a time; extras wait in line
+  // ---------------------------------------------------------------------------
+  const TOAST_DURATION = 5100;
+  let toastQueue   = [];
+  let toastShowing = false;
+
+  function queueToast(headline, thanksText) {
+    toastQueue.push({ headline, thanksText });
+    processQueue();
+  }
+
+  function processQueue() {
+    if (toastShowing || toastQueue.length === 0) return;
+    toastShowing = true;
+    const { headline, thanksText } = toastQueue.shift();
+    renderToast(headline, thanksText);
+    setTimeout(() => { toastShowing = false; processQueue(); }, TOAST_DURATION);
+  }
+
+  function renderToast(headline, thanksText) {
+    toastZone.innerHTML = '';
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.innerHTML = `<span>${headline}</span>` +
+      (thanksText ? `<span class="thanks">${thanksText}</span>` : '');
+    toastZone.appendChild(t);
+    void t.offsetWidth; // force reflow before adding .show
+    t.classList.add('show');
+    setTimeout(() => t.remove(), TOAST_DURATION);
+  }
+
+  // ---------------------------------------------------------------------------
+  // WebSocket connection to the local server
+  // ---------------------------------------------------------------------------
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws    = new WebSocket(`${proto}://${location.host}/ws`);
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'state')       applyState(msg);
+      if (msg.type === 'follow')      queueToast(`+1 Follow — ${msg.username}`, fillTemplate(msg.message, msg.username));
+      if (msg.type === 'sub')         queueToast(`${msg.gift ? 'Sub offert' : 'Nouveau Sub'} — ${msg.username}`, fillTemplate(msg.message, msg.username));
+      if (msg.type === 'goalReached') celebrateGoal();
+    };
+
+    ws.onclose = () => setTimeout(connect, 2000);
+    ws.onerror = () => ws.close();
+  }
+
+  connect();
+</script>
+</body>
+</html>
