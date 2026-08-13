@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>TwitchOverlay — Dashboard</title>
+<style>
+  :root {
+    --bg:         #08090e;
+    --surface:    #0f1018;
+    --surface-2:  #14161f;
+    --border:     #1e2133;
+    --border-hi:  #2a2e47;
+    --text:       #a8adc4;
+    --text-hi:    #dde0f0;
+    --text-dim:   #4a4f6a;
+    --accent:     #9b2a42;
+    --accent-lo:  #5a182a;
+    --accent-hi:  #c93655;
+    --green:      #2d9f5d;
+    --green-text: #5ddba0;
+    --red-text:   #e07080;
+    --red-lo:     #4a1820;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Top bar ────────────────────────────────────── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 10px; }
+  .topbar-logo {
+    width: 22px; height: 22px;
+    background: var(--accent);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    flex-shrink: 0;
+  }
+  .topbar-name { font-size: 13px; font-weight: 600; color: var(--text-hi); letter-spacing: .3px; }
+  .topbar-channel { display: flex; align-items: center; gap: 10px; }
+  .channel-badge {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-hi);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px; font-weight: 500;
+    color: var(--text-hi);
+  }
+  .twitch-dot {
+    width: 8px; height: 8px; border-radius: 2px;
+    background: #9147ff; flex-shrink: 0;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse-dot 2.4s ease-in-out infinite;
+  }
+  .status-dot.offline { background: var(--text-dim); box-shadow: none; animation: none; }
+  @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+
+  /* ── Main layout ─────────────────────────────────── */
+  .main { max-width: 720px; margin: 0 auto; padding: 28px 24px 64px; }
+
+  /* ── Stat cards ──────────────────────────────────── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .stat-label {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-dim); margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 26px; font-weight: 700;
+    color: var(--text-hi); font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+  /* ── Generic card ────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+  }
+  .card-header {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.4px;
+    color: var(--text-dim);
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+
+  /* ── OBS URL ─────────────────────────────────────── */
+  .obs-row { display: flex; align-items: center; gap: 8px; }
+  .obs-url {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border-hi);
+    border-radius: 6px;
+    padding: 7px 11px;
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    font-size: 12px; color: var(--accent-hi);
+    user-select: all; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* ── Buttons ─────────────────────────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 6px 13px;
+    border: 1px solid var(--border-hi); border-radius: 6px;
+    font-size: 12px; font-weight: 500; font-family: inherit;
+    cursor: pointer; background: var(--surface-2); color: var(--text);
+    transition: border-color 120ms, background 120ms, color 120ms;
+    white-space: nowrap; user-select: none;
+  }
+  .btn:hover         { border-color: var(--accent-hi); background: var(--accent-lo); color: #fff; }
+  .btn-primary       { background: var(--accent-lo); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent); }
+  .btn-danger        { border-color: var(--red-lo); color: var(--red-text); }
+  .btn-danger:hover  { background: var(--red-lo); color: #fff; }
+  .btn-row           { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ── Goal input ──────────────────────────────────── */
+  .input-inline { display: flex; gap: 8px; align-items: center; }
+  input[type=number],
+  input[type=text] {
+    background: var(--surface-2);
+    border: 1px solid var(--border-hi);
+    color: var(--text-hi);
+    padding: 6px 10px; border-radius: 6px;
+    font-size: 13px; font-family: inherit;
+    outline: none;
+    transition: border-color 120ms;
+  }
+  input[type=number] { width: 120px; }
+  input[type=text]   { flex: 1; }
+  input[type=number]:focus,
+  input[type=text]:focus { border-color: var(--accent-hi); }
+
+  .field-label {
+    display: block;
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+  }
+
+  /* ── Feedback ────────────────────────────────────── */
+  .feedback {
+    font-size: 11px; color: var(--green-text);
+    margin-top: 8px; min-height: 16px;
+    transition: opacity 300ms;
+  }
+  .feedback.hidden { opacity: 0; }
+
+  /* ── Tabs ────────────────────────────────────────── */
+  .tabs {
+    display: flex; gap: 6px;
+    max-width: 720px; margin: 0 auto;
+    padding: 16px 24px 0;
+  }
+  .tab-btn {
+    padding: 7px 16px;
+    border: 1px solid var(--border-hi); border-radius: 6px 6px 0 0;
+    border-bottom: none;
+    background: var(--surface); color: var(--text);
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    cursor: pointer; letter-spacing: .3px;
+    transition: background 120ms, color 120ms;
+  }
+  .tab-btn.active { background: var(--accent-lo); color: #fff; border-color: var(--accent); }
+  .tab-panel.hidden { display: none; }
+
+  /* ── Select ──────────────────────────────────────── */
+  select {
+    background: var(--surface-2);
+    border: 1px solid var(--border-hi);
+    color: var(--text-hi);
+    padding: 6px 8px; border-radius: 6px;
+    font-size: 12px; font-family: inherit;
+    outline: none;
+  }
+  select:focus { border-color: var(--accent-hi); }
+
+  /* ── Milestone rows ──────────────────────────────── */
+  .milestone-row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .milestone-row .ms-label { flex: 1; }
+  .milestone-row .ms-lp    { width: 80px; }
+
+  /* ── Riot status badge ──────────────────────────────── */
+  .riot-badge { display: inline-flex; align-items: center; gap: 7px; }
+</style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-logo"></div>
+      <span class="topbar-name">TwitchOverlay</span>
+    </div>
+    <div class="topbar-channel">
+      <div class="channel-badge">
+        <div class="twitch-dot"></div>
+        <span id="channelName">—</span>
+      </div>
+      <div class="status-dot offline" id="statusDot"></div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="twitch" onclick="switchTab('twitch')">Twitch</button>
+    <button class="tab-btn" data-tab="lol" onclick="switchTab('lol')">Challenge LoL</button>
+  </nav>
+
+  <main class="main">
+  <div id="tab-twitch" class="tab-panel">
+
+    <!-- OBS Source -->
+    <div class="card">
+      <div class="card-header">Source navigateur OBS</div>
+      <div class="obs-row">
+        <div class="obs-url">http://localhost:3000/overlay.html</div>
+        <button class="btn" onclick="copyURL()">Copier</button>
+      </div>
+      <div class="stat-sub">Largeur/Hauteur de la source à régler sur 1920 × 1080 (pas seulement la taille sur le canevas, sinon l'image sera floue).</div>
+      <div class="feedback hidden" id="copyFeedback">URL copiée dans le presse-papiers</div>
+    </div>
+
+    <!-- Stats -->
+    <div class="card">
+      <div class="card-header">Statistiques en direct</div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Followers</div>
+          <div class="stat-value" id="statFollowers">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Subs</div>
+          <div class="stat-value" id="statSubs">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Objectif</div>
+          <div class="stat-value" id="statGoalPct">—</div>
+          <div class="stat-sub" id="statGoalDetail"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulation -->
+    <div class="card">
+      <div class="card-header">Simulation</div>
+      <div class="btn-row">
+        <button class="btn" onclick="testEvent('follow')">+ Follow</button>
+        <button class="btn" onclick="testEvent('sub')">+ Sub</button>
+        <button class="btn btn-danger" onclick="testEvent('reset')">Réinitialiser</button>
+      </div>
+    </div>
+
+    <!-- Goal -->
+    <div class="card">
+      <div class="card-header">Objectif de subs</div>
+      <div class="input-inline">
+        <input id="goalInput" type="number" min="1" placeholder="100" />
+        <button class="btn btn-primary" onclick="setGoal()">Mettre à jour</button>
+      </div>
+      <div style="margin-top:10px;" class="input-inline">
+        <input id="goalMsgInput" type="text" placeholder="Message motivant affiché sur l'overlay…" />
+        <button class="btn btn-primary" onclick="setGoalMessage()">Mettre à jour</button>
+      </div>
+    </div>
+
+    <!-- Alert messages -->
+    <div class="card">
+      <div class="card-header">Messages d'alerte <span style="font-weight:400;text-transform:none;letter-spacing:0;">— utilisez <code style="color:var(--accent-hi);">{name}</code> pour le pseudo</span></div>
+      <div style="margin-bottom:10px;">
+        <label class="field-label" for="followMsgInput">Follow</label>
+        <div class="input-inline">
+          <input id="followMsgInput" type="text" placeholder="Merci pour le follow, {name} !…" />
+        </div>
+      </div>
+      <div>
+        <label class="field-label" for="subMsgInput">Sub / Sub offert</label>
+        <div class="input-inline">
+          <input id="subMsgInput" type="text" placeholder="GG {name}, merci pour le sub !…" />
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="btn btn-primary" onclick="setAlertMessages()">Mettre à jour</button>
+      </div>
+      <div class="feedback hidden" id="alertMsgFeedback">Messages mis à jour</div>
+    </div>
+
+  </div>
+
+  <div id="tab-lol" class="tab-panel hidden">
+
+    <!-- OBS Sources -->
+    <div class="card">
+      <div class="card-header">Sources navigateur OBS — Challenge LoL</div>
+      <div class="obs-row">
+        <div class="obs-url">http://localhost:3000/overlay_lol.html</div>
+        <button class="btn" onclick="copyURL('http://localhost:3000/overlay_lol.html', 'copyRatioFeedback')">Copier</button>
+      </div>
+      <div class="stat-sub">Largeur/Hauteur de la source à régler sur 530 × 150.</div>
+      <div class="feedback hidden" id="copyRatioFeedback">URL copiée dans le presse-papiers</div>
+      <div class="obs-row" style="margin-top:10px;">
+        <div class="obs-url">http://localhost:3000/overlay_challenge_lp.html</div>
+        <button class="btn" onclick="copyURL('http://localhost:3000/overlay_challenge_lp.html', 'copyLpFeedback')">Copier</button>
+      </div>
+      <div class="stat-sub">Largeur/Hauteur de la source à régler sur 350 × 940.</div>
+      <div class="feedback hidden" id="copyLpFeedback">URL copiée dans le presse-papiers</div>
+      <div class="stat-sub" style="margin-top:10px;">Deux Browser Source indépendantes — chacune peut être déplacée librement dans la scène.</div>
+    </div>
+
+    <!-- Stats -->
+    <div class="card">
+      <div class="card-header">Statistiques en direct <span style="font-weight:400;text-transform:none;letter-spacing:0;">— Solo/Duo uniquement</span></div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Victoires</div>
+          <div class="stat-value" id="riotWins">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Défaites</div>
+          <div class="stat-value" id="riotLosses">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ratio</div>
+          <div class="stat-value" id="riotRatio">—</div>
+          <div class="stat-sub" id="riotRankSub"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Riot status -->
+    <div class="card">
+      <div class="card-header">Statut Riot Games</div>
+      <div class="channel-badge riot-badge">
+        <div class="status-dot offline" id="riotStatusDot"></div>
+        <span id="riotStatusText">Non configuré</span>
+      </div>
+      <div class="stat-sub" id="riotAccountText" style="margin-top:8px;"></div>
+      <div class="stat-sub" id="riotErrorText" style="margin-top:4px;color:var(--red-text);"></div>
+    </div>
+
+    <!-- Ajustements -->
+    <div class="card">
+      <div class="card-header">Ajustements <span style="font-weight:400;text-transform:none;letter-spacing:0;">— modifient réellement le décompte du challenge</span></div>
+      <div class="btn-row">
+        <button class="btn" onclick="riotAdjust(1,0)">+1 Victoire</button>
+        <button class="btn" onclick="riotAdjust(-1,0)">-1 Victoire</button>
+        <button class="btn" onclick="riotAdjust(0,1)">+1 Défaite</button>
+        <button class="btn" onclick="riotAdjust(0,-1)">-1 Défaite</button>
+      </div>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-danger" onclick="riotStart()">Démarrer / Réinitialiser le challenge</button>
+      </div>
+    </div>
+
+    <!-- Simulation -->
+    <div class="card">
+      <div class="card-header">Simulation</div>
+      <div class="btn-row">
+        <button class="btn" onclick="riotTestMatch('win')">Simuler victoire</button>
+        <button class="btn" onclick="riotTestMatch('loss')">Simuler défaite</button>
+        <button class="btn" onclick="riotTestMilestone()">Simuler palier</button>
+      </div>
+    </div>
+
+    <!-- Milestones -->
+    <div class="card">
+      <div class="card-header">Paliers de la barre LP <span style="font-weight:400;text-transform:none;letter-spacing:0;">— triés automatiquement du plus bas au plus haut</span></div>
+      <div id="milestoneRows"></div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn" onclick="addMilestoneRow()">+ Ajouter un palier</button>
+        <button class="btn btn-primary" onclick="saveMilestones()">Enregistrer les paliers</button>
+      </div>
+      <div class="feedback hidden" id="milestoneFeedback">Paliers enregistrés</div>
+    </div>
+
+  </div>
+  </main>
+
+<script>
+  let connected = false;
+
+  async function refresh() {
+    try {
+      const r = await fetch('/state');
+      if (!r.ok) throw new Error();
+      const s = await r.json();
+
+      if (s.twitchUsername) document.getElementById('channelName').textContent = s.twitchUsername;
+
+      if (!connected) {
+        connected = true;
+        document.getElementById('statusDot').classList.remove('offline');
+      }
+
+      document.getElementById('statFollowers').textContent = (s.followers ?? 0).toLocaleString('fr-FR');
+      document.getElementById('statSubs').textContent      = (s.subs      ?? 0).toLocaleString('fr-FR');
+
+      const goal = s.subGoal || 100;
+      const pct  = Math.min(100, Math.round(((s.subs ?? 0) / goal) * 100));
+      document.getElementById('statGoalPct').textContent    = pct + ' %';
+      document.getElementById('statGoalDetail').textContent = `${(s.subs ?? 0).toLocaleString('fr-FR')} / ${goal.toLocaleString('fr-FR')} subs`;
+
+      const msgInput = document.getElementById('goalMsgInput');
+      if (s.goalMessage !== undefined) msgInput.placeholder = s.goalMessage || "Message motivant affiché sur l'overlay\u2026";
+
+      const fInput = document.getElementById('followMsgInput');
+      const sInput = document.getElementById('subMsgInput');
+
+      // Les messages sauvegardés sont affichés comme valeur du champ
+      // afin de pouvoir les modifier directement sans perdre le texte.
+      // On évite aussi d'écraser une saisie en cours pendant le refresh automatique
+      // tant qu'elle n'a pas été explicitement enregistrée (pas seulement pendant le focus).
+      if (!alertMsgsDirty) {
+        if (s.followMessage !== undefined) fInput.value = s.followMessage || 'Merci pour le follow, {name} !';
+        if (s.subMessage    !== undefined) sInput.value = s.subMessage    || 'GG {name}, merci pour le sub !';
+      }
+    } catch {
+      connected = false;
+      document.getElementById('statusDot').classList.add('offline');
+    }
+  }
+
+  async function testEvent(name) {
+    await fetch('/admin/test/' + name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    refresh();
+  }
+
+  async function setGoal() {
+    const val = Number(document.getElementById('goalInput').value);
+    if (!val || val < 1) return;
+    await fetch('/admin/goal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subGoal: val }) });
+    document.getElementById('goalInput').value = '';
+    refresh();
+  }
+
+  async function setGoalMessage() {
+    const val = document.getElementById('goalMsgInput').value;
+    await fetch('/admin/goal-message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goalMessage: val }) });
+    document.getElementById('goalMsgInput').value = '';
+    refresh();
+  }
+
+  let alertMsgsDirty = false;
+  document.getElementById('followMsgInput').addEventListener('input', () => { alertMsgsDirty = true; });
+  document.getElementById('subMsgInput').addEventListener('input', () => { alertMsgsDirty = true; });
+
+  async function setAlertMessages() {
+    const follow = document.getElementById('followMsgInput').value;
+    const sub    = document.getElementById('subMsgInput').value;
+    await fetch('/admin/alert-messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ followMessage: follow, subMessage: sub }) });
+    // On conserve les messages dans les champs après la sauvegarde.
+    alertMsgsDirty = false;
+    const fb = document.getElementById('alertMsgFeedback');
+    fb.classList.remove('hidden');
+    setTimeout(() => fb.classList.add('hidden'), 2000);
+    refresh();
+  }
+
+  function copyURL(url, feedbackId) {
+    url        = url || 'http://localhost:3000/overlay.html';
+    feedbackId = feedbackId || 'copyFeedback';
+    navigator.clipboard.writeText(url).then(() => {
+      const fb = document.getElementById(feedbackId);
+      fb.classList.remove('hidden');
+      setTimeout(() => fb.classList.add('hidden'), 2000);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tabs
+  // ---------------------------------------------------------------------------
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+    document.getElementById('tab-twitch').classList.toggle('hidden', tab !== 'twitch');
+    document.getElementById('tab-lol').classList.toggle('hidden', tab !== 'lol');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Challenge LoL — Riot API
+  // ---------------------------------------------------------------------------
+  const RIOT_TIERS       = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+  const RIOT_TIER_LABELS = { IRON: 'Fer', BRONZE: 'Bronze', SILVER: 'Argent', GOLD: 'Or', PLATINUM: 'Platine', EMERALD: 'Émeraude', DIAMOND: 'Diamant', MASTER: 'Maître', GRANDMASTER: 'Grand Maître', CHALLENGER: 'Challenger' };
+  const RIOT_DIVISIONS   = ['IV', 'III', 'II', 'I'];
+  const RIOT_APEX        = new Set(['MASTER', 'GRANDMASTER', 'CHALLENGER']);
+
+  let milestonesState  = [];
+  let riotConnected    = false;
+  let milestonesDirty  = false;
+
+  document.getElementById('milestoneRows').addEventListener('input',  () => { milestonesDirty = true; });
+  document.getElementById('milestoneRows').addEventListener('change', () => { milestonesDirty = true; });
+
+  function tierLabel(tier, division) {
+    if (!tier) return '';
+    return RIOT_APEX.has(tier) ? (RIOT_TIER_LABELS[tier] || tier) : `${RIOT_TIER_LABELS[tier] || tier} ${division || ''}`.trim();
+  }
+
+  async function refreshRiot() {
+    try {
+      const r = await fetch('/riot/state');
+      if (!r.ok) throw new Error();
+      const s = await r.json();
+      riotConnected = true;
+
+      const statusMap = {
+        unconfigured: { text: 'Non configuré — voir .env.example', cls: 'offline' },
+        connecting:   { text: 'Connexion en cours…', cls: 'offline' },
+        ok:           { text: 'Connecté', cls: '' },
+        error:        { text: 'Erreur', cls: 'offline' },
+      };
+      const st = statusMap[s.riotStatus] || statusMap.unconfigured;
+      document.getElementById('riotStatusText').textContent = st.text;
+      document.getElementById('riotStatusDot').className    = 'status-dot ' + st.cls;
+      document.getElementById('riotAccountText').textContent = s.riotAccount ? `Compte suivi : ${s.riotAccount}` : '';
+      document.getElementById('riotErrorText').textContent   = s.riotError || '';
+
+      document.getElementById('riotWins').textContent   = s.wins ?? 0;
+      document.getElementById('riotLosses').textContent = s.losses ?? 0;
+      const total = (s.wins ?? 0) + (s.losses ?? 0);
+      document.getElementById('riotRatio').textContent   = total > 0 ? Math.round((s.wins / total) * 100) + ' %' : '—';
+      document.getElementById('riotRankSub').textContent = s.currentRank ? `${tierLabel(s.currentRank.tier, s.currentRank.division)} — ${s.currentRank.lp} LP` : '';
+
+      if (!milestonesDirty) {
+        milestonesState = s.milestones || [];
+        renderMilestoneRows();
+      }
+    } catch {
+      riotConnected = false;
+      document.getElementById('riotStatusText').textContent = 'Serveur injoignable';
+      document.getElementById('riotStatusDot').className    = 'status-dot offline';
+    }
+  }
+
+  function renderMilestoneRows() {
+    const container = document.getElementById('milestoneRows');
+    container.innerHTML = '';
+    milestonesState.forEach((m, i) => container.appendChild(buildMilestoneRow(m, i)));
+  }
+
+  function buildMilestoneRow(m, i) {
+    const row    = document.createElement('div');
+    row.className = 'milestone-row';
+    const tier   = (m.tier || 'DIAMOND').toUpperCase();
+    const isApex = RIOT_APEX.has(tier);
+    row.innerHTML = `
+      <input type="text" class="ms-label" placeholder="Libellé (optionnel)" value="${(m.label || '').replace(/"/g, '&quot;')}" />
+      <select class="ms-tier">${RIOT_TIERS.map((t) => `<option value="${t}" ${tier === t ? 'selected' : ''}>${RIOT_TIER_LABELS[t]}</option>`).join('')}</select>
+      <select class="ms-division" ${isApex ? 'disabled' : ''}>${RIOT_DIVISIONS.map((d) => `<option value="${d}" ${(m.division || 'IV').toUpperCase() === d ? 'selected' : ''}>${d}</option>`).join('')}</select>
+      <input type="number" class="ms-lp" min="0" value="${m.lp ?? 0}" />
+      <button class="btn btn-danger" onclick="removeMilestoneRow(${i})">✕</button>
+    `;
+    row.querySelector('.ms-tier').addEventListener('change', (e) => {
+      row.querySelector('.ms-division').disabled = RIOT_APEX.has(e.target.value);
+    });
+    return row;
+  }
+
+  // Relit les valeurs actuellement affichées dans le DOM vers milestonesState,
+  // en conservant id/reachedAt par position. Doit être appelé avant tout ajout,
+  // suppression ou sauvegarde : sinon un re-render (ajout/suppression) écrase
+  // les saisies en cours dans les autres lignes, et une sauvegarde sans id/reachedAt
+  // réinitialiserait la progression de tous les paliers.
+  function syncMilestonesStateFromRows() {
+    const rows = document.querySelectorAll('#milestoneRows .milestone-row');
+    milestonesState = Array.from(rows).map((row, i) => ({
+      id:        milestonesState[i] ? milestonesState[i].id : undefined,
+      label:     row.querySelector('.ms-label').value,
+      tier:      row.querySelector('.ms-tier').value,
+      division:  row.querySelector('.ms-division').value,
+      lp:        Number(row.querySelector('.ms-lp').value) || 0,
+      reachedAt: milestonesState[i] ? milestonesState[i].reachedAt : null,
+    }));
+  }
+
+  function addMilestoneRow() {
+    syncMilestonesStateFromRows();
+    milestonesDirty = true;
+    milestonesState.push({ label: '', tier: 'DIAMOND', division: 'IV', lp: 0, reachedAt: null });
+    renderMilestoneRows();
+    const rows = document.querySelectorAll('#milestoneRows .milestone-row');
+    const last = rows[rows.length - 1];
+    if (last) last.querySelector('.ms-label').focus();
+  }
+
+  function removeMilestoneRow(i) {
+    syncMilestonesStateFromRows();
+    milestonesDirty = true;
+    milestonesState.splice(i, 1);
+    renderMilestoneRows();
+  }
+
+  async function saveMilestones() {
+    syncMilestonesStateFromRows();
+    await fetch('/riot/milestones', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ milestones: milestonesState }) });
+    milestonesDirty = false;
+    const fb = document.getElementById('milestoneFeedback');
+    fb.classList.remove('hidden');
+    setTimeout(() => fb.classList.add('hidden'), 2000);
+    refreshRiot();
+  }
+
+  async function riotAdjust(wins, losses) {
+    await fetch('/riot/adjust', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wins, losses }) });
+    refreshRiot();
+  }
+
+  async function riotTestMatch(result) {
+    await fetch('/riot/test/match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ result }) });
+    refreshRiot();
+  }
+
+  async function riotTestMilestone() {
+    await fetch('/riot/test/milestone', { method: 'POST' });
+  }
+
+  async function riotStart() {
+    if (!confirm('Réinitialiser le challenge ? Les victoires/défaites repartent à zéro et les games déjà jouées ne seront plus comptées.')) return;
+    const r = await fetch('/riot/start', { method: 'POST' });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      alert(data.error || 'Impossible de démarrer le challenge.');
+    }
+    refreshRiot();
+  }
+
+  refresh();
+  refreshRiot();
+  setInterval(refresh, 4000);
+  setInterval(refreshRiot, 4000);
+</script>
+</body>
+</html>
