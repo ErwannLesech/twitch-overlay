@@ -3,13 +3,29 @@
   "version": "1.0.0",
   "description": "Overlay OBS temps reel (subs, followers, sub goal) via Twitch EventSub",
   "main": "server.js",
+  "bin": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "build:win": "pkg . --targets node18-win-x64 --output dist/OverlayTwitch.exe",
+    "build:mac": "pkg . --targets node18-macos-x64 --output dist/OverlayTwitch-mac",
+    "build:all": "pkg . --targets node18-win-x64,node18-macos-x64 --out-path dist"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "assets": [
+      "public/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
   }
 }
