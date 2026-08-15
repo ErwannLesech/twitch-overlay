@@ -321,6 +321,7 @@
         <input id="goalMsgInput" type="text" placeholder="Message motivant affiché sur l'overlay…" />
         <button class="btn btn-primary" onclick="setGoalMessage()">Mettre à jour</button>
       </div>
+      <div class="feedback hidden" id="goalFeedback">Objectif mis à jour</div>
     </div>
 
     <!-- Alert messages -->
@@ -443,16 +444,6 @@
       </div>
     </div>
 
-    <!-- Simulation -->
-    <div class="card">
-      <div class="card-header">Simulation</div>
-      <div class="btn-row">
-        <button class="btn" onclick="riotTestMatch('win')">Simuler victoire</button>
-        <button class="btn" onclick="riotTestMatch('loss')">Simuler défaite</button>
-        <button class="btn" onclick="riotTestMilestone()">Simuler palier</button>
-      </div>
-    </div>
-
     <!-- Milestones -->
     <div class="card">
       <div class="card-header">Paliers de la barre LP <span style="font-weight:400;text-transform:none;letter-spacing:0;">— triés automatiquement du plus bas au plus haut</span></div>
@@ -491,8 +482,10 @@
       document.getElementById('statGoalPct').textContent    = pct + ' %';
       document.getElementById('statGoalDetail').textContent = `${(s.subs ?? 0).toLocaleString('fr-FR')} / ${goal.toLocaleString('fr-FR')} subs`;
 
-      const msgInput = document.getElementById('goalMsgInput');
-      if (s.goalMessage !== undefined) msgInput.placeholder = s.goalMessage || "Message motivant affiché sur l'overlay\u2026";
+      const goalInput = document.getElementById('goalInput');
+      const msgInput  = document.getElementById('goalMsgInput');
+      if (!goalDirty && s.subGoal !== undefined) goalInput.value = s.subGoal;
+      if (!goalMsgDirty && s.goalMessage !== undefined) msgInput.value = s.goalMessage || '';
 
       const fInput = document.getElementById('followMsgInput');
       const sInput = document.getElementById('subMsgInput');
@@ -522,16 +515,29 @@
     const val = Number(document.getElementById('goalInput').value);
     if (!val || val < 1) return;
     await fetch('/admin/goal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subGoal: val }) });
-    document.getElementById('goalInput').value = '';
+    goalDirty = false;
+    showFeedback('goalFeedback');
     refresh();
   }
 
   async function setGoalMessage() {
     const val = document.getElementById('goalMsgInput').value;
     await fetch('/admin/goal-message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goalMessage: val }) });
-    document.getElementById('goalMsgInput').value = '';
+    goalMsgDirty = false;
+    showFeedback('goalFeedback');
     refresh();
   }
+
+  function showFeedback(id) {
+    const fb = document.getElementById(id);
+    fb.classList.remove('hidden');
+    setTimeout(() => fb.classList.add('hidden'), 2000);
+  }
+
+  let goalDirty = false;
+  let goalMsgDirty = false;
+  document.getElementById('goalInput').addEventListener('input', () => { goalDirty = true; });
+  document.getElementById('goalMsgInput').addEventListener('input', () => { goalMsgDirty = true; });
 
   let alertMsgsDirty = false;
   document.getElementById('followMsgInput').addEventListener('input', () => { alertMsgsDirty = true; });
@@ -711,15 +717,6 @@
   async function riotAdjust(wins, losses) {
     await fetch('/riot/adjust', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wins, losses }) });
     refreshRiot();
-  }
-
-  async function riotTestMatch(result) {
-    await fetch('/riot/test/match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ result }) });
-    refreshRiot();
-  }
-
-  async function riotTestMilestone() {
-    await fetch('/riot/test/milestone', { method: 'POST' });
   }
 
   async function riotStart() {
