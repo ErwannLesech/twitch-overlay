@@ -396,6 +396,28 @@
       </div>
     </div>
 
+    <!-- Session -->
+    <div class="card">
+      <div class="card-header">Statistiques de la session <span style="font-weight:400;text-transform:none;letter-spacing:0;">— remises à zéro à la fermeture du serveur</span></div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Victoires</div>
+          <div class="stat-value" id="riotSessionWins">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Défaites</div>
+          <div class="stat-value" id="riotSessionLosses">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ratio</div>
+          <div class="stat-value" id="riotSessionRatio">—</div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn" onclick="riotResetSession()">Réinitialiser la session</button>
+      </div>
+    </div>
+
     <!-- Riot status -->
     <div class="card">
       <div class="card-header">Statut Riot Games</div>
@@ -596,6 +618,11 @@
       document.getElementById('riotRatio').textContent   = total > 0 ? Math.round((s.wins / total) * 100) + ' %' : '—';
       document.getElementById('riotRankSub').textContent = s.currentRank ? `${tierLabel(s.currentRank.tier, s.currentRank.division)} — ${s.currentRank.lp} LP` : '';
 
+      document.getElementById('riotSessionWins').textContent   = s.sessionWins ?? 0;
+      document.getElementById('riotSessionLosses').textContent = s.sessionLosses ?? 0;
+      const sessionTotal = (s.sessionWins ?? 0) + (s.sessionLosses ?? 0);
+      document.getElementById('riotSessionRatio').textContent  = sessionTotal > 0 ? Math.round((s.sessionWins / sessionTotal) * 100) + ' %' : '—';
+
       if (!milestonesDirty) {
         milestonesState = s.milestones || [];
         renderMilestoneRows();
@@ -672,6 +699,12 @@
     const fb = document.getElementById('milestoneFeedback');
     fb.classList.remove('hidden');
     setTimeout(() => fb.classList.add('hidden'), 2000);
+    refreshRiot();
+  }
+
+  async function riotResetSession() {
+    if (!confirm('Réinitialiser le score de la session ?')) return;
+    await fetch('/riot/reset-session', { method: 'POST' });
     refreshRiot();
   }
 
