@@ -38,6 +38,7 @@ function setConfig(cfg) {
 // ---------------------------------------------------------------------------
 const STATE_DEFAULTS = {
   followers: 0, subs: 0, subGoal: 100, goalReachedNotified: false,
+  alertsEnabled: true,
   goalMessage:   "Chaque sub rapproche la guilde de la victoire — rejoins-nous !",
   followMessage: "Merci pour le follow, {name} ! Bienvenue dans la Faille",
   subMessage:    "GG {name}, merci pour le sub ! Un guerrier de plus dans l'équipe",
@@ -65,6 +66,7 @@ const state = loadState();
 function resetState() {
   Object.assign(state, STATE_DEFAULTS, {
     subGoal:             state.subGoal,
+    alertsEnabled:       state.alertsEnabled,
     goalMessage:         state.goalMessage,
     followMessage:       state.followMessage,
     subMessage:          state.subMessage,

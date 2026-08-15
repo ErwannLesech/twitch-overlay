@@ -219,6 +219,30 @@
 
   /* ── Riot status badge ──────────────────────────────── */
   .riot-badge { display: inline-flex; align-items: center; gap: 7px; }
+
+  /* ── Toggle switch ───────────────────────────────────── */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    margin-bottom: 14px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .toggle-text { flex: 1; }
+  .toggle-title { font-size: 13px; font-weight: 600; color: var(--text-hi); }
+  .toggle-desc { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch-slider {
+    position: absolute; inset: 0; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--border-hi);
+    border-radius: 999px; transition: background 120ms, border-color 120ms;
+  }
+  .switch-slider::before {
+    content: ""; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px;
+    background: var(--text-dim); border-radius: 50%;
+    transition: transform 150ms, background 150ms;
+  }
+  .switch input:checked + .switch-slider { background: var(--accent-lo); border-color: var(--accent); }
+  .switch input:checked + .switch-slider::before { transform: translateX(16px); background: #fff; }
 </style>
 </head>
 <body>
@@ -302,6 +326,16 @@
     <!-- Alert messages -->
     <div class="card">
       <div class="card-header">Messages d'alerte <span style="font-weight:400;text-transform:none;letter-spacing:0;">— utilisez <code style="color:var(--accent-hi);">{name}</code> pour le pseudo</span></div>
+      <div class="toggle-row">
+        <div class="toggle-text">
+          <div class="toggle-title">Alertes à l'écran</div>
+          <div class="toggle-desc">Désactivez si les alertes follow/sub sont déjà affichées par un autre outil (StreamElements, Streamlabs…), pour éviter les doublons. Les compteurs de followers/subs restent à jour dans tous les cas.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="alertsEnabledToggle" onchange="setAlertsEnabled()" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
       <div style="margin-bottom:10px;">
         <label class="field-label" for="followMsgInput">Follow</label>
         <div class="input-inline">
@@ -449,6 +483,8 @@
         if (s.followMessage !== undefined) fInput.value = s.followMessage || 'Merci pour le follow, {name} !';
         if (s.subMessage    !== undefined) sInput.value = s.subMessage    || 'GG {name}, merci pour le sub !';
       }
+
+      if (s.alertsEnabled !== undefined) document.getElementById('alertsEnabledToggle').checked = s.alertsEnabled;
     } catch {
       connected = false;
       document.getElementById('statusDot').classList.add('offline');
@@ -489,6 +525,11 @@
     fb.classList.remove('hidden');
     setTimeout(() => fb.classList.add('hidden'), 2000);
     refresh();
+  }
+
+  async function setAlertsEnabled() {
+    const enabled = document.getElementById('alertsEnabledToggle').checked;
+    await fetch('/admin/alerts-toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
   }
 
   function copyURL(url, feedbackId) {
