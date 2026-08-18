@@ -219,6 +219,30 @@
 
   /* ── Riot status badge ──────────────────────────────── */
   .riot-badge { display: inline-flex; align-items: center; gap: 7px; }
+
+  /* ── Toggle switch ───────────────────────────────────── */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    margin-bottom: 14px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .toggle-text { flex: 1; }
+  .toggle-title { font-size: 13px; font-weight: 600; color: var(--text-hi); }
+  .toggle-desc { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch-slider {
+    position: absolute; inset: 0; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--border-hi);
+    border-radius: 999px; transition: background 120ms, border-color 120ms;
+  }
+  .switch-slider::before {
+    content: ""; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px;
+    background: var(--text-dim); border-radius: 50%;
+    transition: transform 150ms, background 150ms;
+  }
+  .switch input:checked + .switch-slider { background: var(--accent-lo); border-color: var(--accent); }
+  .switch input:checked + .switch-slider::before { transform: translateX(16px); background: #fff; }
 </style>
 </head>
 <body>
@@ -297,11 +321,22 @@
         <input id="goalMsgInput" type="text" placeholder="Message motivant affiché sur l'overlay…" />
         <button class="btn btn-primary" onclick="setGoalMessage()">Mettre à jour</button>
       </div>
+      <div class="feedback hidden" id="goalFeedback">Objectif mis à jour</div>
     </div>
 
     <!-- Alert messages -->
     <div class="card">
       <div class="card-header">Messages d'alerte <span style="font-weight:400;text-transform:none;letter-spacing:0;">— utilisez <code style="color:var(--accent-hi);">{name}</code> pour le pseudo</span></div>
+      <div class="toggle-row">
+        <div class="toggle-text">
+          <div class="toggle-title">Alertes à l'écran</div>
+          <div class="toggle-desc">Désactivez si les alertes follow/sub sont déjà affichées par un autre outil (StreamElements, Streamlabs…), pour éviter les doublons. Les compteurs de followers/subs restent à jour dans tous les cas.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="alertsEnabledToggle" onchange="setAlertsEnabled()" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
       <div style="margin-bottom:10px;">
         <label class="field-label" for="followMsgInput">Follow</label>
         <div class="input-inline">
@@ -362,6 +397,28 @@
       </div>
     </div>
 
+    <!-- Session -->
+    <div class="card">
+      <div class="card-header">Statistiques de la session <span style="font-weight:400;text-transform:none;letter-spacing:0;">— remises à zéro à la fermeture du serveur</span></div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Victoires</div>
+          <div class="stat-value" id="riotSessionWins">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Défaites</div>
+          <div class="stat-value" id="riotSessionLosses">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ratio</div>
+          <div class="stat-value" id="riotSessionRatio">—</div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn" onclick="riotResetSession()">Réinitialiser la session</button>
+      </div>
+    </div>
+
     <!-- Riot status -->
     <div class="card">
       <div class="card-header">Statut Riot Games</div>
@@ -384,16 +441,6 @@
       </div>
       <div class="btn-row" style="margin-top:8px;">
         <button class="btn btn-danger" onclick="riotStart()">Démarrer / Réinitialiser le challenge</button>
-      </div>
-    </div>
-
-    <!-- Simulation -->
-    <div class="card">
-      <div class="card-header">Simulation</div>
-      <div class="btn-row">
-        <button class="btn" onclick="riotTestMatch('win')">Simuler victoire</button>
-        <button class="btn" onclick="riotTestMatch('loss')">Simuler défaite</button>
-        <button class="btn" onclick="riotTestMilestone()">Simuler palier</button>
       </div>
     </div>
 
@@ -435,8 +482,10 @@
       document.getElementById('statGoalPct').textContent    = pct + ' %';
       document.getElementById('statGoalDetail').textContent = `${(s.subs ?? 0).toLocaleString('fr-FR')} / ${goal.toLocaleString('fr-FR')} subs`;
 
-      const msgInput = document.getElementById('goalMsgInput');
-      if (s.goalMessage !== undefined) msgInput.placeholder = s.goalMessage || "Message motivant affiché sur l'overlay\u2026";
+      const goalInput = document.getElementById('goalInput');
+      const msgInput  = document.getElementById('goalMsgInput');
+      if (!goalDirty && s.subGoal !== undefined) goalInput.value = s.subGoal;
+      if (!goalMsgDirty && s.goalMessage !== undefined) msgInput.value = s.goalMessage || '';
 
       const fInput = document.getElementById('followMsgInput');
       const sInput = document.getElementById('subMsgInput');
@@ -449,6 +498,8 @@
         if (s.followMessage !== undefined) fInput.value = s.followMessage || 'Merci pour le follow, {name} !';
         if (s.subMessage    !== undefined) sInput.value = s.subMessage    || 'GG {name}, merci pour le sub !';
       }
+
+      if (s.alertsEnabled !== undefined) document.getElementById('alertsEnabledToggle').checked = s.alertsEnabled;
     } catch {
       connected = false;
       document.getElementById('statusDot').classList.add('offline');
@@ -464,16 +515,29 @@
     const val = Number(document.getElementById('goalInput').value);
     if (!val || val < 1) return;
     await fetch('/admin/goal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subGoal: val }) });
-    document.getElementById('goalInput').value = '';
+    goalDirty = false;
+    showFeedback('goalFeedback');
     refresh();
   }
 
   async function setGoalMessage() {
     const val = document.getElementById('goalMsgInput').value;
     await fetch('/admin/goal-message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goalMessage: val }) });
-    document.getElementById('goalMsgInput').value = '';
+    goalMsgDirty = false;
+    showFeedback('goalFeedback');
     refresh();
   }
+
+  function showFeedback(id) {
+    const fb = document.getElementById(id);
+    fb.classList.remove('hidden');
+    setTimeout(() => fb.classList.add('hidden'), 2000);
+  }
+
+  let goalDirty = false;
+  let goalMsgDirty = false;
+  document.getElementById('goalInput').addEventListener('input', () => { goalDirty = true; });
+  document.getElementById('goalMsgInput').addEventListener('input', () => { goalMsgDirty = true; });
 
   let alertMsgsDirty = false;
   document.getElementById('followMsgInput').addEventListener('input', () => { alertMsgsDirty = true; });
@@ -489,6 +553,11 @@
     fb.classList.remove('hidden');
     setTimeout(() => fb.classList.add('hidden'), 2000);
     refresh();
+  }
+
+  async function setAlertsEnabled() {
+    const enabled = document.getElementById('alertsEnabledToggle').checked;
+    await fetch('/admin/alerts-toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
   }
 
   function copyURL(url, feedbackId) {
@@ -554,6 +623,11 @@
       const total = (s.wins ?? 0) + (s.losses ?? 0);
       document.getElementById('riotRatio').textContent   = total > 0 ? Math.round((s.wins / total) * 100) + ' %' : '—';
       document.getElementById('riotRankSub').textContent = s.currentRank ? `${tierLabel(s.currentRank.tier, s.currentRank.division)} — ${s.currentRank.lp} LP` : '';
+
+      document.getElementById('riotSessionWins').textContent   = s.sessionWins ?? 0;
+      document.getElementById('riotSessionLosses').textContent = s.sessionLosses ?? 0;
+      const sessionTotal = (s.sessionWins ?? 0) + (s.sessionLosses ?? 0);
+      document.getElementById('riotSessionRatio').textContent  = sessionTotal > 0 ? Math.round((s.sessionWins / sessionTotal) * 100) + ' %' : '—';
 
       if (!milestonesDirty) {
         milestonesState = s.milestones || [];
@@ -634,18 +708,15 @@
     refreshRiot();
   }
 
+  async function riotResetSession() {
+    if (!confirm('Réinitialiser le score de la session ?')) return;
+    await fetch('/riot/reset-session', { method: 'POST' });
+    refreshRiot();
+  }
+
   async function riotAdjust(wins, losses) {
     await fetch('/riot/adjust', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wins, losses }) });
     refreshRiot();
-  }
-
-  async function riotTestMatch(result) {
-    await fetch('/riot/test/match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ result }) });
-    refreshRiot();
-  }
-
-  async function riotTestMilestone() {
-    await fetch('/riot/test/milestone', { method: 'POST' });
   }
 
   async function riotStart() {

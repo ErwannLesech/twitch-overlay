@@ -127,15 +127,15 @@ async function connectEventSub() {
 
       if (subType === "channel.follow") {
         state.followers += 1;
-        broadcast({ type: "follow", username: event.user_name, message: state.followMessage });
+        if (state.alertsEnabled) broadcast({ type: "follow", username: event.user_name, message: state.followMessage });
       }
       if (subType === "channel.subscribe") {
         state.subs += 1;
-        broadcast({ type: "sub", username: event.user_name, tier: event.tier, message: state.subMessage });
+        if (state.alertsEnabled) broadcast({ type: "sub", username: event.user_name, tier: event.tier, message: state.subMessage });
       }
       if (subType === "channel.subscription.gift") {
         state.subs += event.total || 1;
-        broadcast({ type: "sub", username: event.user_name || "Anonyme", tier: event.tier, gift: true, message: state.subMessage });
+        if (state.alertsEnabled) broadcast({ type: "sub", username: event.user_name || "Anonyme", tier: event.tier, gift: true, message: state.subMessage });
       }
 
       if (checkGoalReached()) broadcast({ type: "goalReached" });

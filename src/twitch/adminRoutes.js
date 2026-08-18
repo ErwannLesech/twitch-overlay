@@ -29,6 +29,16 @@ router.post("/admin/goal-message", (req, res) => {
   res.json(state);
 });
 
+router.post("/admin/alerts-toggle", (req, res) => {
+  const { enabled } = req.body;
+  if (typeof enabled === "boolean") {
+    state.alertsEnabled = enabled;
+    saveState();
+    broadcastState();
+  }
+  res.json(state);
+});
+
 router.post("/admin/alert-messages", (req, res) => {
   const { followMessage, subMessage } = req.body;
   if (typeof followMessage === "string") state.followMessage = followMessage.trim();
@@ -42,10 +52,10 @@ router.post("/admin/test/:event", (req, res) => {
   const { event } = req.params;
   if (event === "follow") {
     state.followers += 1;
-    broadcast({ type: "follow", username: "TestViewer" + Math.floor(Math.random() * 999), message: state.followMessage });
+    if (state.alertsEnabled) broadcast({ type: "follow", username: "TestViewer" + Math.floor(Math.random() * 999), message: state.followMessage });
   } else if (event === "sub") {
     state.subs += 1;
-    broadcast({ type: "sub", username: "TestSub" + Math.floor(Math.random() * 999), tier: "1000", message: state.subMessage });
+    if (state.alertsEnabled) broadcast({ type: "sub", username: "TestSub" + Math.floor(Math.random() * 999), tier: "1000", message: state.subMessage });
   } else if (event === "reset") {
     resetState();
   }

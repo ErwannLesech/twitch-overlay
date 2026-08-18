@@ -36,6 +36,8 @@ router.post("/riot/start", async (req, res) => {
     if (!challenge.puuid) await resolveRiotAccountInfo();
     challenge.wins               = 0;
     challenge.losses             = 0;
+    challenge.sessionWins        = 0;
+    challenge.sessionLosses      = 0;
     challenge.lastMatchId        = await captureRiotBaselineMatchId();
     challenge.challengeStartedAt = Date.now();
     challenge.milestones.forEach((m) => { m.reachedAt = null; });
@@ -46,6 +48,14 @@ router.post("/riot/start", async (req, res) => {
     console.error("Erreur lors du demarrage du challenge :", e.message);
     res.status(500).json({ error: "Impossible de contacter l'API Riot pour demarrer le challenge." });
   }
+});
+
+router.post("/riot/reset-session", (req, res) => {
+  challenge.sessionWins   = 0;
+  challenge.sessionLosses = 0;
+  saveChallenge();
+  broadcastRiotState();
+  res.json(challenge);
 });
 
 router.post("/riot/adjust", (req, res) => {
