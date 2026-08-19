@@ -9,7 +9,8 @@ const CONFIG_FILE    = path.join(BASE_DIR, "config.json");
 const TOKENS_FILE    = path.join(BASE_DIR, "tokens.json");
 const STATE_FILE     = path.join(BASE_DIR, "state.json");
 const CHALLENGE_FILE = path.join(BASE_DIR, "challenge.json");
+const SPECTATOR_FILE = path.join(BASE_DIR, "spectator.json");
 const PUBLIC_DIR     = path.join(__dirname, "..", "public");
 const PORT = 3000;
 
-module.exports = { BASE_DIR, CONFIG_FILE, TOKENS_FILE, STATE_FILE, CHALLENGE_FILE, PUBLIC_DIR, PORT };
+module.exports = { BASE_DIR, CONFIG_FILE, TOKENS_FILE, STATE_FILE, CHALLENGE_FILE, SPECTATOR_FILE, PUBLIC_DIR, PORT };

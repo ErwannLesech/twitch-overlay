@@ -20,6 +20,9 @@ const { connectEventSub } = require("./src/twitch/eventsub");
 const riotAdminRoutes = require("./src/riot/adminRoutes");
 const { startRiotChallenge } = require("./src/riot/poll");
 
+const spectatorAdminRoutes = require("./src/spectator/adminRoutes");
+const { startSpectator } = require("./src/spectator/poll");
+
 // ---------------------------------------------------------------------------
 // Express application
 // ---------------------------------------------------------------------------
@@ -38,6 +41,7 @@ app.get("/admin", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "admin.html")
 app.use(twitchAuthRoutes);
 app.use(twitchAdminRoutes);
 app.use(riotAdminRoutes);
+app.use(spectatorAdminRoutes);
 
 // ---------------------------------------------------------------------------
 // HTTP server startup
@@ -51,6 +55,7 @@ const server = app.listen(PORT, () => {
   console.log(`Overlay principal  : http://localhost:${PORT}/overlay.html`);
   console.log(`Overlay LoL        : http://localhost:${PORT}/overlay_lol.html`);
   console.log(`Overlay LoL LP     : http://localhost:${PORT}/overlay_challenge_lp.html`);
+  console.log(`Overlay Spectateur : http://localhost:${PORT}/overlay_spectator.html`);
 
   if (!getConfig()) {
     openBrowser(`http://localhost:${PORT}/setup.html`);
@@ -62,6 +67,7 @@ const server = app.listen(PORT, () => {
   }
 
   startRiotChallenge();
+  startSpectator();
 });
 
 server.on("error", (err) => {

@@ -1,5 +1,5 @@
 const { WebSocketServer, WebSocket } = require("ws");
-const { state, challenge } = require("./store");
+const { state, challenge, spectator } = require("./store");
 
 let wss = null;
 
@@ -9,6 +9,7 @@ function initWebsocket(server) {
   wss.on("connection", (ws) => {
     ws.send(JSON.stringify({ type: "state", ...state }));
     ws.send(JSON.stringify(riotStatePayload()));
+    ws.send(JSON.stringify(spectatorStatePayload()));
   });
 
   return wss;
@@ -48,4 +49,22 @@ function broadcastRiotState() {
   broadcast(riotStatePayload());
 }
 
-module.exports = { initWebsocket, broadcast, broadcastState, broadcastRiotState };
+function spectatorStatePayload() {
+  return {
+    type:            "spectatorState",
+    casting:         spectator.casting,
+    spectatorStatus: spectator.spectatorStatus,
+    spectatorError:  spectator.spectatorError,
+    gameTime:        spectator.gameTime,
+    goldDiff:        spectator.goldDiff,
+    teamGold:        spectator.teamGold,
+    recentEvents:    spectator.recentEvents,
+    match:           spectator.match,
+  };
+}
+
+function broadcastSpectatorState() {
+  broadcast(spectatorStatePayload());
+}
+
+module.exports = { initWebsocket, broadcast, broadcastState, broadcastRiotState, broadcastSpectatorState };
