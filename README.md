@@ -9,7 +9,11 @@
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-F7DF1E?logo=javascript&logoColor=black)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-Serveur Node.js local qui écoute les événements Twitch en temps réel (EventSub WebSocket) et pousse les mises à jour vers des pages overlay ajoutées dans OBS via **Browser Source**. Inclut aussi **Challenge LoL**, un module optionnel qui suit un compte League of Legends via l'API Riot Games (rang, LP, historique de parties) pour habiller un challenge de rank en direct.
+Serveur Node.js local qui écoute les événements Twitch en temps réel (EventSub WebSocket) et pousse les mises à jour vers des pages overlay ajoutées dans OBS via **Browser Source**. Trois modules indépendants, chacun avec son propre rythme (voir [Architecture technique](#architecture-technique)) :
+
+1. **Twitch** — alertes follow/sub/gift-sub et objectif de subs.
+2. **Challenge LoL** — rang Solo/Duo suivi via l'API Riot Games.
+3. **Spectateur Cast** — overlay façon diffusion pro par-dessus le HUD League pendant un match de tournoi specté.
 
 Aucun fichier `.env` à éditer manuellement pour la partie Twitch : au premier lancement, le serveur ouvre automatiquement un assistant de configuration dans le navigateur. Distribué aux streamers sous forme d'un `.exe` unique — pas de Node.js à installer côté utilisateur final.
 
@@ -21,6 +25,7 @@ Aucun fichier `.env` à éditer manuellement pour la partie Twitch : au premier 
 - [Pour qui ?](#pour-qui-)
 - [Installation développeur](#installation-développeur)
 - [Challenge LoL (optionnel)](#challenge-lol-optionnel)
+- [Spectateur Cast (compétition)](#spectateur-cast-compétition)
 - [Construire un .exe](#construire-un-exe)
 - [Architecture technique](#architecture-technique)
 - [Pistes d'extension](#pistes-dextension)
@@ -36,6 +41,7 @@ Aucun fichier `.env` à éditer manuellement pour la partie Twitch : au premier 
 - 💬 **Messages personnalisables** (follow, sub, objectif atteint) avec placeholder `{name}`.
 - 🕹️ **Panneau d'administration** pour simuler des événements, ajuster les compteurs et l'apparence sans toucher au code.
 - 🏆 **Challenge LoL** (optionnel) : rang Solo/Duo, ratio victoires/défaites, barre de progression LP avec paliers configurables, historique des 10 dernières parties classées.
+- 📺 **Spectateur Cast** (optionnel) : overlay façon diffusion pro par-dessus le HUD League pendant un match spectée en tournoi amateur — diff d'or, objectifs pris, bandeau d'équipes/round configuré à la main.
 - 📦 **Distribution en un seul `.exe`** (via `pkg`) : le streamer n'installe rien, juste un double-clic.
 - 🇫🇷 **Interface entièrement en français**, pensée pour des streamers non-développeurs.
 
@@ -135,6 +141,30 @@ Comme pour `overlay.html`, ajoutez chaque page comme sa propre **Browser Source*
 
 ---
 
+## Spectateur Cast (compétition)
+
+Troisième scène OBS indépendante, pensée pour un tournoi amateur : quand vous (ou votre observateur, **sur la même machine que ce serveur**) spectate une partie League, `overlay_spectator.html` se superpose au HUD natif du client avec le nom des deux équipes, un diff d'or estimé et un ticker des objectifs pris (dragon, Baron, Héraut, tourelles, inhibiteurs).
+
+Contrairement aux productions officielles (LEC/LCK/Worlds), qui utilisent un accès interne aux serveurs de partie non disponible publiquement (les flux temps réel diffusés à des partenaires passent par **Bayes Esports Solutions**, sous licence), ce module s'appuie sur la seule API publique qui expose des données de partie en direct : la **Live Client Data API** du client League (`https://127.0.0.1:2999/liveclientdata/`), active uniquement pendant qu'une partie est jouée, spectée, **ou qu'un replay est lu** sur la machine locale. Riot n'exposant pas l'or exact de chaque joueur pour un spectateur, le diff affiché est une **estimation** basée sur le prix cumulé des items possédés par chaque équipe — l'approche standard des overlays communautaires.
+
+### 1. Configurer le match dans l'admin
+
+Onglet **Spectateur Cast** de `/admin` :
+- Renseignez les noms/logos des deux équipes et le libellé du round (ex. "Quart de finale — BO3 (1-0)") dans la carte "Configuration du match" — Riot n'a aucune notion de votre bracket, tout est saisi à la main.
+- Activez **Mode Cast** juste avant de spectate la partie (ou de lancer un replay). Le statut passe à *En direct* dès que le client League répond ; désactivez-le entre deux games.
+
+### 2. Ajouter l'overlay dans OBS
+
+`http://localhost:3000/overlay_spectator.html` — 1920 × 1080, comme `overlay.html` (calque plein écran, fond transparent, positionné à `0, 0` par-dessus la source du client League).
+
+### 3. Comment tester (sans match de tournoi en cours)
+
+- **Méthode principale : un replay.** L'API Live Client Data reste active pendant la lecture d'un `.rofl` (une game déjà jouée, la vôtre ou récupérée ailleurs) exactement comme pendant une vraie partie spectée en direct. Activez Mode Cast, lancez la lecture du replay dans le client League : diff d'or, ticker d'objectifs, tout le pipeline se comporte comme en conditions réelles.
+- **Alternative** : spectate une partie "Practice Tool" (bots, solo) en direct.
+- **Itération visuelle pure** (sans lancer League) : laissez **Mode Cast désactivé** puis `POST http://localhost:3000/spectator/test/inject` avec un payload `allgamedata` d'exemple dans le body — traverse le même code de traitement que le vrai sondage, pratique pour peaufiner le CSS de l'overlay sans dépendance externe. Route backend uniquement, pas de bouton dans l'admin (même logique que `/riot/test/*`, conservées mais volontairement retirées de l'interface). **Important** : si Mode Cast est activé, le sondage réel (toutes les 2s) écrase le snapshot injecté dès qu'il ne parvient pas à joindre un vrai client League — désactivez Mode Cast pour que la valeur injectée reste stable.
+
+---
+
 ## Construire un .exe
 
 Le projet utilise [pkg](https://github.com/vercel/pkg) pour empaqueter Node.js, le serveur et les pages HTML dans un seul exécutable — sans dépendance à installer côté utilisateur final.
@@ -156,7 +186,7 @@ Cela génère `dist/OverlayTwitch.exe` (≈ 40 Mo, Node.js est embarqué).
 **Comportement de l'exécutable :**
 - **Premier lancement** : ouvre l'assistant de configuration dans le navigateur.
 - **Lancements suivants** : ouvre directement le panneau d'administration (ou la page d'autorisation Twitch si elle n'a pas encore été effectuée).
-- `config.json`, `state.json`, `tokens.json` et `challenge.json` sont créés **à côté de l'exe** — la configuration et les compteurs survivent aux redémarrages.
+- `config.json`, `state.json`, `tokens.json`, `challenge.json` et `spectator.json` sont créés **à côté de l'exe** — la configuration et les compteurs survivent aux redémarrages.
 
 > **Note Windows** — L'exe n'étant pas signé par un certificat commercial, Windows SmartScreen peut afficher un avertissement au premier lancement. Cliquez sur **Informations complémentaires** → **Exécuter quand même**. Ce comportement est standard pour tout exécutable non signé.
 
@@ -164,15 +194,25 @@ Cela génère `dist/OverlayTwitch.exe` (≈ 40 Mo, Node.js est embarqué).
 
 ## Architecture technique
 
+Trois modules indépendants, chacun avec son propre rythme :
+
+| Module | Rythme | Déclenchement |
+|---|---|---|
+| Twitch (follow/sub) | Push événementiel (WebSocket EventSub), 0 polling | Toujours actif dès la connexion Twitch établie |
+| Challenge LoL (solo queue) | Poll fixe toutes les 60s | Actif en continu si `.env` Riot configuré |
+| Spectateur Cast (compétition) | Poll rapide (~2s) | Actif uniquement quand "Mode Cast" est activé dans l'admin — évite de solliciter l'API locale hors sessions de cast |
+
 ```mermaid
 flowchart LR
     Twitch["Twitch EventSub\n(WebSocket)"] --> Server
     Riot["API Riot Games\n(polling 60s)"] --> Server
+    Spectator["Client League\nLive Client Data API\n(polling ~2s, sur activation)"] --> Server
     Server["server.js\nExpress + ws"] -->|"/ws"| Overlay["overlay.html\nfollow / sub / goal"]
     Server -->|"/ws"| OverlayLol["overlay_lol.html\nprofil / rang / historique"]
     Server -->|"/ws"| OverlayLp["overlay_challenge_lp.html\nbarre de LP"]
-    Admin["admin.html"] -->|"/state, /admin/*, /riot/*"| Server
-    Server --> Files[("config.json\nstate.json\nchallenge.json\ntokens.json")]
+    Server -->|"/ws"| OverlaySpectator["overlay_spectator.html\ndiff d'or / objectifs"]
+    Admin["admin.html"] -->|"/state, /admin/*, /riot/*, /spectator/*"| Server
+    Server --> Files[("config.json\nstate.json\nchallenge.json\nspectator.json\ntokens.json")]
 ```
 
 | Fichier | Rôle |
@@ -183,13 +223,16 @@ flowchart LR
 | `public/setup.html` | Assistant de configuration initiale |
 | `public/overlay_lol.html` | Widget League of Legends (profil, rang, ratio, historique de parties) |
 | `public/overlay_challenge_lp.html` | Widget barre LP avec paliers du Challenge LoL |
+| `public/overlay_spectator.html` | Canvas 1920 × 1080, diff d'or estimé + ticker d'objectifs, par-dessus le HUD League |
+| `src/spectator/*` | Sondage de la Live Client Data API, calcul du diff d'or, détection des objectifs |
 | `config.json` | Client ID/Secret, broadcaster ID, préférences visuelles |
 | `state.json` | Compteurs persistants (followers, subs, objectif) |
 | `tokens.json` | Tokens OAuth Twitch (rafraîchis automatiquement) |
 | `.env` | Clé API Riot + compte suivi pour le Challenge LoL (optionnel) |
 | `challenge.json` | Compteurs et paliers persistants du Challenge LoL |
+| `spectator.json` | Configuration du match (équipes/round) et dernier snapshot du Spectateur Cast |
 
-**Flux de données :**
+**Flux de données (exemple Twitch) :**
 1. Twitch envoie un événement via `wss://eventsub.wss.twitch.tv/ws`
 2. `server.js` met à jour l'état et diffuse un message sur le WebSocket local (`/ws`)
 3. `overlay.html` reçoit le message et anime le compteur ou affiche le toast d'alerte
@@ -214,6 +257,7 @@ flowchart LR
 | Erreur à `/auth/callback` | Vérifiez que l'URL de redirection configurée dans la console dev Twitch est exactement `http://localhost:3000/auth/callback`. |
 | Les événements Twitch n'arrivent pas | Consultez les logs du terminal — Twitch renvoie le motif d'échec de l'abonnement EventSub en clair (problème de scope OAuth dans la majorité des cas). |
 | Le port 3000 est déjà utilisé | Une autre instance du programme est peut-être active. Fermez-la ou redémarrez la machine. |
+| Le Spectateur Cast reste sur "En attente" | Normal tant qu'aucune partie n'est jouée/spectée/en replay sur cette machine — le client League doit tourner localement, sur le même poste que ce serveur (la Live Client Data API n'est jamais accessible à distance). |
 
 ---
 

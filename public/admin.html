@@ -264,6 +264,7 @@
   <nav class="tabs">
     <button class="tab-btn active" data-tab="twitch" onclick="switchTab('twitch')">Twitch</button>
     <button class="tab-btn" data-tab="lol" onclick="switchTab('lol')">Challenge LoL</button>
+    <button class="tab-btn" data-tab="spectator" onclick="switchTab('spectator')">Spectateur Cast</button>
   </nav>
 
   <main class="main">
@@ -456,6 +457,95 @@
     </div>
 
   </div>
+
+  <div id="tab-spectator" class="tab-panel hidden">
+
+    <!-- OBS Source -->
+    <div class="card">
+      <div class="card-header">Source navigateur OBS — Spectateur Cast</div>
+      <div class="obs-row">
+        <div class="obs-url">http://localhost:3000/overlay_spectator.html</div>
+        <button class="btn" onclick="copyURL('http://localhost:3000/overlay_spectator.html', 'copySpectatorFeedback')">Copier</button>
+      </div>
+      <div class="stat-sub">Largeur/Hauteur de la source à régler sur 1920 × 1080 — calque plein écran par-dessus le HUD League (client League et ce serveur doivent tourner sur la même machine).</div>
+      <div class="feedback hidden" id="copySpectatorFeedback">URL copiée dans le presse-papiers</div>
+    </div>
+
+    <!-- Mode Cast -->
+    <div class="card">
+      <div class="card-header">Mode Cast</div>
+      <div class="toggle-row" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">
+        <div class="toggle-text">
+          <div class="toggle-title">Activer le cast</div>
+          <div class="toggle-desc">À activer juste avant de spectate la partie (ou de lancer un replay) — le serveur interroge alors le client League toutes les 2 secondes pour l'or et les objectifs. Désactivez entre deux games pour ne pas solliciter l'API inutilement.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="castToggle" onchange="setCasting()" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="channel-badge riot-badge" style="margin-top:14px;">
+        <div class="status-dot offline" id="spectatorStatusDot"></div>
+        <span id="spectatorStatusText">Inactif</span>
+      </div>
+      <div class="stat-sub" id="spectatorErrorText" style="margin-top:4px;color:var(--red-text);"></div>
+    </div>
+
+    <!-- Aperçu en direct -->
+    <div class="card">
+      <div class="card-header">Aperçu en direct <span style="font-weight:400;text-transform:none;letter-spacing:0;">— pour vérifier que les données arrivent sans ouvrir l'overlay</span></div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Temps de jeu</div>
+          <div class="stat-value" id="spectatorGameTime">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Diff. d'or (estimée)</div>
+          <div class="stat-value" id="spectatorGoldDiff">—</div>
+        </div>
+      </div>
+      <div class="stat-sub" style="margin-top:10px;margin-bottom:6px;">Derniers événements</div>
+      <div id="spectatorEventsList" class="stat-sub">—</div>
+    </div>
+
+    <!-- Configuration du match -->
+    <div class="card">
+      <div class="card-header">Configuration du match <span style="font-weight:400;text-transform:none;letter-spacing:0;">— saisie manuelle, Riot n'a aucune notion de votre bracket</span></div>
+      <div style="margin-bottom:10px;">
+        <label class="field-label" for="teamBlueNameInput">Équipe bleue — nom</label>
+        <div class="input-inline">
+          <input id="teamBlueNameInput" type="text" placeholder="Nom de l'équipe" />
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label class="field-label" for="teamBlueLogoInput">Équipe bleue — logo (URL)</label>
+        <div class="input-inline">
+          <input id="teamBlueLogoInput" type="text" placeholder="https://…/logo.png" />
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label class="field-label" for="teamRedNameInput">Équipe rouge — nom</label>
+        <div class="input-inline">
+          <input id="teamRedNameInput" type="text" placeholder="Nom de l'équipe" />
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label class="field-label" for="teamRedLogoInput">Équipe rouge — logo (URL)</label>
+        <div class="input-inline">
+          <input id="teamRedLogoInput" type="text" placeholder="https://…/logo.png" />
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label class="field-label" for="roundLabelInput">Round</label>
+        <div class="input-inline">
+          <input id="roundLabelInput" type="text" placeholder="ex. Quart de finale — BO3 (1-0)" />
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveSpectatorConfig()">Enregistrer</button>
+      <div class="feedback hidden" id="spectatorConfigFeedback">Configuration enregistrée</div>
+    </div>
+
+  </div>
   </main>
 
 <script>
@@ -577,6 +667,7 @@
     document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     document.getElementById('tab-twitch').classList.toggle('hidden', tab !== 'twitch');
     document.getElementById('tab-lol').classList.toggle('hidden', tab !== 'lol');
+    document.getElementById('tab-spectator').classList.toggle('hidden', tab !== 'spectator');
   }
 
   // ---------------------------------------------------------------------------
@@ -729,10 +820,84 @@
     refreshRiot();
   }
 
+  // ---------------------------------------------------------------------------
+  // Spectateur Cast — Live Client Data API
+  // ---------------------------------------------------------------------------
+  let spectatorConfigDirty = false;
+  ['teamBlueNameInput', 'teamBlueLogoInput', 'teamRedNameInput', 'teamRedLogoInput', 'roundLabelInput']
+    .forEach((id) => document.getElementById(id).addEventListener('input', () => { spectatorConfigDirty = true; }));
+
+  async function refreshSpectator() {
+    try {
+      const r = await fetch('/spectator/state');
+      if (!r.ok) throw new Error();
+      const s = await r.json();
+
+      document.getElementById('castToggle').checked = !!s.casting;
+
+      const statusMap = {
+        idle:    { text: 'Inactif',                cls: 'offline' },
+        waiting: { text: 'En attente d’une partie', cls: 'offline' },
+        live:    { text: 'En direct',               cls: '' },
+        error:   { text: 'Erreur',                  cls: 'offline' },
+      };
+      const st = statusMap[s.spectatorStatus] || statusMap.idle;
+      document.getElementById('spectatorStatusText').textContent = st.text;
+      document.getElementById('spectatorStatusDot').className    = 'status-dot ' + st.cls;
+      document.getElementById('spectatorErrorText').textContent  = s.spectatorError || '';
+
+      document.getElementById('spectatorGameTime').textContent = s.gameTime != null
+        ? Math.floor(s.gameTime / 60) + ':' + String(Math.floor(s.gameTime % 60)).padStart(2, '0')
+        : '—';
+      document.getElementById('spectatorGoldDiff').textContent = s.goldDiff != null
+        ? (s.goldDiff >= 0 ? '+' : '') + s.goldDiff.toLocaleString('fr-FR')
+        : '—';
+
+      const events = s.recentEvents || [];
+      document.getElementById('spectatorEventsList').textContent = events.length
+        ? events.map((e) => e.EventName).join(', ')
+        : '—';
+
+      if (!spectatorConfigDirty) {
+        const m = s.match || {};
+        document.getElementById('teamBlueNameInput').value = m.teamBlueName || '';
+        document.getElementById('teamBlueLogoInput').value = m.teamBlueLogo || '';
+        document.getElementById('teamRedNameInput').value  = m.teamRedName  || '';
+        document.getElementById('teamRedLogoInput').value  = m.teamRedLogo  || '';
+        document.getElementById('roundLabelInput').value   = m.roundLabel   || '';
+      }
+    } catch {
+      document.getElementById('spectatorStatusText').textContent = 'Serveur injoignable';
+      document.getElementById('spectatorStatusDot').className    = 'status-dot offline';
+    }
+  }
+
+  async function setCasting() {
+    const enabled = document.getElementById('castToggle').checked;
+    await fetch('/spectator/cast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
+    refreshSpectator();
+  }
+
+  async function saveSpectatorConfig() {
+    const body = {
+      teamBlueName: document.getElementById('teamBlueNameInput').value,
+      teamBlueLogo: document.getElementById('teamBlueLogoInput').value,
+      teamRedName:  document.getElementById('teamRedNameInput').value,
+      teamRedLogo:  document.getElementById('teamRedLogoInput').value,
+      roundLabel:   document.getElementById('roundLabelInput').value,
+    };
+    await fetch('/spectator/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    spectatorConfigDirty = false;
+    showFeedback('spectatorConfigFeedback');
+    refreshSpectator();
+  }
+
   refresh();
   refreshRiot();
+  refreshSpectator();
   setInterval(refresh, 4000);
   setInterval(refreshRiot, 4000);
+  setInterval(refreshSpectator, 4000);
 </script>
 </body>
 </html>

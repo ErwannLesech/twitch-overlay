@@ -1,5 +1,5 @@
 const fs = require("fs");
-const { CONFIG_FILE, TOKENS_FILE, STATE_FILE, CHALLENGE_FILE } = require("./paths");
+const { CONFIG_FILE, TOKENS_FILE, STATE_FILE, CHALLENGE_FILE, SPECTATOR_FILE } = require("./paths");
 
 // ---------------------------------------------------------------------------
 // config.json — Twitch Client ID/Secret, broadcasterId, twitchUsername.
@@ -128,6 +128,41 @@ challenge.sessionWins   = 0;
 challenge.sessionLosses = 0;
 
 // ---------------------------------------------------------------------------
+// spectator.json — Spectateur Cast (Live Client Data API) state.
+// ---------------------------------------------------------------------------
+const SPECTATOR_DEFAULTS = {
+  casting:         false,   // interrupteur manuel (admin) - rythme "sur activation", pas de poll permanent
+  spectatorStatus: "idle",  // idle | waiting | live | error
+  spectatorError:  null,
+  gameTime:        null,
+  goldDiff:        null,    // gold equipe bleue - gold equipe rouge
+  teamGold:        { blue: 0, red: 0 },
+  lastEventId:     -1,      // dernier EventID Live Client Data traite
+  recentEvents:    [],      // ring buffer des derniers events (feed debug admin + ticker overlay)
+  match: {                  // saisi a la main dans l'admin, jamais deduit de l'API
+    teamBlueName: "", teamBlueLogo: "",
+    teamRedName:  "", teamRedLogo:  "",
+    roundLabel:   "",       // ex. "Quart de finale - BO3 (1-0)"
+  },
+};
+
+function loadSpectator() {
+  if (!fs.existsSync(SPECTATOR_FILE)) return { ...SPECTATOR_DEFAULTS };
+  try {
+    return { ...SPECTATOR_DEFAULTS, ...JSON.parse(fs.readFileSync(SPECTATOR_FILE, "utf-8")) };
+  } catch {
+    console.error(`[!] ${SPECTATOR_FILE} est illisible ou corrompu - le spectateur cast repart de zero`);
+    return { ...SPECTATOR_DEFAULTS };
+  }
+}
+
+function saveSpectator() {
+  fs.writeFileSync(SPECTATOR_FILE, JSON.stringify(spectator, null, 2));
+}
+
+const spectator = loadSpectator();
+
+// ---------------------------------------------------------------------------
 // tokens.json — OAuth access/refresh tokens.
 // ---------------------------------------------------------------------------
 function loadTokens() {
@@ -148,5 +183,6 @@ module.exports = {
   getConfig, setConfig,
   STATE_DEFAULTS, state, saveState, resetState, checkGoalReached,
   CHALLENGE_DEFAULTS, challenge, saveChallenge,
+  SPECTATOR_DEFAULTS, spectator, saveSpectator,
   loadTokens, saveTokens,
 };

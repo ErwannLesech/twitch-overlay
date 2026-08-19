@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Overlay Spectateur Cast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue:        #3E9BFF;
+    --blue-bright: #7FC2FF;
+    --red:         #E0263F;
+    --red-bright:  #FF5A6E;
+    --violet-bright: #B57BFF;
+    --text:        #FFFFFF;
+    --chip-bg:     rgba(10, 8, 14, 0.68);
+    --chip-border: rgba(255, 255, 255, 0.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    background: transparent;
+    overflow: hidden;
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--text);
+  }
+
+  /* ---- Top banner — equipes + diff d'or + round, calque au-dessus du HUD League ---- */
+  .cast-banner {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 400ms ease;
+  }
+  .cast-banner.visible { opacity: 1; }
+
+  .teams-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: var(--chip-bg);
+    border: 1px solid var(--chip-border);
+    backdrop-filter: blur(3px);
+    padding: 10px 22px;
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  }
+
+  .team {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 160px;
+  }
+  .team.red { flex-direction: row-reverse; text-align: right; }
+  .team-logo {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    visibility: hidden;
+  }
+  .team-name {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .team.blue .team-name { color: var(--blue-bright); text-shadow: 0 0 10px rgba(62,155,255,.55); }
+  .team.red  .team-name { color: var(--red-bright);  text-shadow: 0 0 10px rgba(224,38,63,.55); }
+
+  .gold-diff-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 180px;
+  }
+  .gold-diff-value {
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .gold-diff-track {
+    position: relative;
+    width: 180px;
+    height: 6px;
+    background: rgba(255,255,255,.08);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .gold-diff-fill {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 50%;
+    width: 0%;
+    transition: width 500ms ease, left 500ms ease, background 300ms ease;
+  }
+
+  .round-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text);
+    opacity: .75;
+  }
+
+  .waiting-msg {
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text);
+    opacity: .55;
+  }
+
+  /* ---- Event ticker — bas de l'ecran ---- */
+  .ticker-zone {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+  }
+  .ticker-item {
+    background: var(--chip-bg);
+    border: 1px solid var(--chip-border);
+    backdrop-filter: blur(3px);
+    padding: 6px 18px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px);
+    opacity: 0;
+  }
+  .ticker-item.show {
+    animation: ticker-in 400ms cubic-bezier(.2,.9,.3,1.2) forwards, ticker-out 400ms ease-in forwards 4200ms;
+  }
+  @keyframes ticker-in  { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes ticker-out { to { opacity: 0; transform: translateY(-10px); } }
+</style>
+</head>
+<body>
+
+  <div class="cast-banner" id="castBanner">
+    <div class="teams-row">
+      <div class="team blue">
+        <img class="team-logo" id="teamBlueLogo" alt="" />
+        <span class="team-name" id="teamBlueName">Équipe bleue</span>
+      </div>
+      <div class="gold-diff-block">
+        <span class="gold-diff-value" id="goldDiffValue">—</span>
+        <div class="gold-diff-track"><div class="gold-diff-fill" id="goldDiffFill"></div></div>
+      </div>
+      <div class="team red">
+        <img class="team-logo" id="teamRedLogo" alt="" />
+        <span class="team-name" id="teamRedName">Équipe rouge</span>
+      </div>
+    </div>
+    <div class="round-label" id="roundLabel"></div>
+    <div class="waiting-msg" id="waitingMsg"></div>
+  </div>
+
+  <div class="ticker-zone" id="tickerZone"></div>
+
+<script>
+  const EVENT_LABELS = {
+    ChampionKill: 'Élimination',
+    DragonKill:   'Dragon',
+    BaronKill:    'Baron Nashor',
+    HeraldKill:   'Héraut',
+    TurretKilled: 'Tourelle détruite',
+    InhibKilled:  'Inhibiteur détruit',
+  };
+
+  const castBannerEl   = document.getElementById('castBanner');
+  const teamBlueLogoEl = document.getElementById('teamBlueLogo');
+  const teamBlueNameEl = document.getElementById('teamBlueName');
+  const teamRedLogoEl  = document.getElementById('teamRedLogo');
+  const teamRedNameEl  = document.getElementById('teamRedName');
+  const goldDiffValueEl = document.getElementById('goldDiffValue');
+  const goldDiffFillEl  = document.getElementById('goldDiffFill');
+  const roundLabelEl    = document.getElementById('roundLabel');
+  const waitingMsgEl    = document.getElementById('waitingMsg');
+  const tickerZoneEl    = document.getElementById('tickerZone');
+
+  function setLogo(imgEl, url) {
+    if (url) {
+      imgEl.src = url;
+      imgEl.style.visibility = 'visible';
+    } else {
+      imgEl.style.visibility = 'hidden';
+    }
+  }
+
+  // Diff plafonne a 6000 or (estime a partir du prix cumule des items) pour
+  // que la barre reste lisible meme en late game.
+  const GOLD_DIFF_CAP = 6000;
+
+  function applySpectatorState(s) {
+    castBannerEl.classList.toggle('visible', !!s.casting);
+
+    const m = s.match || {};
+    teamBlueNameEl.textContent = m.teamBlueName || 'Équipe bleue';
+    teamRedNameEl.textContent  = m.teamRedName  || 'Équipe rouge';
+    setLogo(teamBlueLogoEl, m.teamBlueLogo);
+    setLogo(teamRedLogoEl, m.teamRedLogo);
+    roundLabelEl.textContent = m.roundLabel || '';
+
+    if (s.spectatorStatus === 'live' && s.goldDiff != null) {
+      waitingMsgEl.textContent = '';
+      const diff  = s.goldDiff;
+      const ratio = Math.max(-1, Math.min(1, diff / GOLD_DIFF_CAP));
+      const pct   = Math.abs(ratio) * 50;
+      goldDiffFillEl.style.background = diff >= 0 ? 'var(--blue-bright)' : 'var(--red-bright)';
+      goldDiffFillEl.style.left       = diff >= 0 ? '50%' : (50 - pct) + '%';
+      goldDiffFillEl.style.width      = pct + '%';
+      goldDiffValueEl.textContent     = (diff >= 0 ? '+' : '') + diff.toLocaleString('fr-FR') + ' or';
+      goldDiffValueEl.style.color     = diff >= 0 ? 'var(--blue-bright)' : 'var(--red-bright)';
+    } else {
+      goldDiffFillEl.style.width  = '0%';
+      goldDiffValueEl.textContent = '—';
+      waitingMsgEl.textContent    = s.spectatorStatus === 'error'
+        ? (s.spectatorError || 'Erreur de connexion au client League')
+        : 'En attente d\'une partie spectée…';
+    }
+  }
+
+  function formatEvent(e) {
+    const label = EVENT_LABELS[e.EventName] || e.EventName;
+    return e.KillerName ? `${label} — ${e.KillerName}` : label;
+  }
+
+  function showTickerEvent(event) {
+    const item = document.createElement('div');
+    item.className = 'ticker-item';
+    item.textContent = formatEvent(event);
+    tickerZoneEl.appendChild(item);
+    void item.offsetWidth;
+    item.classList.add('show');
+    setTimeout(() => item.remove(), 4600);
+  }
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws    = new WebSocket(`${proto}://${location.host}/ws`);
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'spectatorState') applySpectatorState(msg);
+      if (msg.type === 'spectatorEvent') showTickerEvent(msg.event);
+    };
+
+    ws.onclose = () => setTimeout(connect, 2000);
+    ws.onerror = () => ws.close();
+  }
+
+  connect();
+</script>
+</body>
+</html>
